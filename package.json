@@ -1,0 +1,39 @@
+{
+  "name": "chromatix-assets",
+  "version": "0.0.0",
+  "description": "",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "tags:generate": "node lib/tagImageGenerator.ts",
+    "knip": "knip",
+    "lint": "eslint . --cache",
+    "lint:fix": "eslint . --fix --cache",
+    "lint:clear": "rm -f .eslintcache",
+    "prettier": "prettier --check \"**/*.{ts,json,md}\"",
+    "prettier:fix": "prettier --write \"**/*.{ts,json,md}\"",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run knip && npm run lint && npm run prettier && npm run typecheck"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "@google/genai": "^2.13.0",
+    "chalk": "^5.6.2",
+    "dotenv": "^17.4.2",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.5",
+    "eslint": "^10.7.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.7.0",
+    "knip": "^6.29.0",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.65.0"
+  }
+}

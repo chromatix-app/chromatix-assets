@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    // Build
+    "lib": ["esnext"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "noEmit": true,
+    "target": "ES2023",
+
+    // Interop
+    "allowImportingTsExtensions": true,
+    "allowJs": false,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+
+    // Type safety
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "strict": true,
+
+    // Type sources
+    "types": ["node"]
+  },
+  "include": ["lib"]
+}

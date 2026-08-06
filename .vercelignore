@@ -1,0 +1,5 @@
+*
+!assets
+!assets/**
+!data
+!data/tags.json
