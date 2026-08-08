@@ -26,13 +26,13 @@ This repo does not contain source code for the Chromatix web app itself - that i
 
 When browsing your music library in Chromatix, you can browse by tags such as genres, moods, and styles. This repo contains the thumbnail images for those tags, which are stored in `assets/tags/community/` and served from [https://assets.chromatix.app/](https://assets.chromatix.app/).
 
-Tags are essentially unlimited as people can tag items however they want, but anonymised usage data has allowed most tags in use to be collated here in `data/tags.json`. Some tags are already very niche, bizarre, or badly formatted, but they're taken from legitimate usage of the app.
+Tags are essentially unlimited as people can tag items however they want, but anonymised usage data has allowed many tags in use to be collated here in `data/tags.json`. Some tags are already very niche, bizarre, or badly formatted, but they're taken from legitimate usage of the app.
 
 The sheer number of tags made manual curation unfeasible, but batch-generated AI images are a practical alternative. That does mean lots of the images are poor quality, but the goal is to have something for every tag.
 
 This repo is open for the community to contribute to improving the images. Submitted images can be created manually, via the bundled generator, or however else you like.
 
-The images from this repo will be rolled out to the Chromatix app in a future release. They will be an entirely optional opt-in feature, although may become opt-out later on.
+The images from this repo will hopefully be rolled out to the Chromatix app in a future release. They will be an entirely optional opt-in feature, although may become opt-out later on.
 
 Example of some of the images in use in the app:
 
@@ -107,7 +107,7 @@ https://assets.chromatix.app/data/tags.json
 
 # 6. Examples
 
-Some of the generated images are good. Some are ok. Many are terrible. Most are purple for some reason.
+Some of the generated images are good. Some are ok. Many are terrible. Most are purple for some reason. Hopefully nothing in here is in any way insensitive or offensive, but if you see anything that is, please let us know.
 
 The main goal is to have a set of good and somewhat consistent images for every tag. Preferably fairly simple and identifiable at a glance, with a good variety of different colours used as appropriate. Below are some examples of the better ones, and some of the worst ones, to give a sense of the aims and the current state of the generator.
 
