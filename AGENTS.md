@@ -52,9 +52,13 @@ images by hand.
 `CONFIG.width` x `CONFIG.height` with `sharp` and writes it to `assets/tags/community/<slug>.jpg`.
 
 **All tunables live in the `CONFIG` object at the top of the file** — model, prompt text, output dimensions, file
-paths, reference tiers, request delay, max generations per run, and `startTag` (for resuming/testing from partway
-through the list). This is deliberate: anyone picking up the script should be able to see and change every knob in
-one place without reading the implementation.
+paths, reference tiers, sampling temperature, request delay, max generations per run, and `startTag` (for
+resuming/testing from partway through the list). This is deliberate: anyone picking up the script should be able to
+see and change every knob in one place without reading the implementation.
+
+Each request also gets a random `seed`, generated per call rather than fixed in `CONFIG`. Combined with
+`CONFIG.temperature`, this means deleting a generated image and re-running the script produces a genuinely different
+result for that tag rather than reliably reproducing the same image.
 
 ### Why the reference-tier retry logic exists
 

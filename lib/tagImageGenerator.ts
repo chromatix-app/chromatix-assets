@@ -52,6 +52,11 @@ const CONFIG = {
     './references/tags/community/thumbnails3',
   ],
 
+  // Sampling temperature for generation - higher values increase output diversity. Combined with a
+  // random seed per request (see generateThumbnail), this ensures regenerating a tag (after deleting
+  // its existing output file) produces a genuinely different image rather than a near-identical repeat.
+  temperature: 1.2,
+
   // Delay between requests, in milliseconds
   requestDelayMs: 1000,
 
@@ -134,6 +139,10 @@ async function generateThumbnail(tag: string, referenceParts: ReferencePart[], o
     model: CONFIG.model,
     contents: [{ text: prompt }, ...referenceParts],
     config: {
+      temperature: CONFIG.temperature,
+      // Random per request so identical prompts (e.g. regenerating a deleted tag) don't reliably
+      // reproduce the same output - omitting seed still allows repeats since it only nudges sampling.
+      seed: Math.floor(Math.random() * 2 ** 31),
       imageConfig: {
         // Closest supported enum to the target 5:3 output - minimises the crop `sharp` then applies
         aspectRatio: '3:2',
