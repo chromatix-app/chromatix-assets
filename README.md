@@ -12,15 +12,16 @@ This repo does not contain source code for the Chromatix web app itself - that i
 
 - [1. About this repo](#1-about-this-repo)
 - [2. Contributing images](#2-contributing-images)
-- [3. Generating new tag images with Gemini](#3-generating-new-tag-images-with-gemini)
-  - [3.1. Install dependencies](#31-install-dependencies)
-  - [3.2. Set up your Gemini API key](#32-set-up-your-gemini-api-key)
-  - [3.3. Run the generator](#33-run-the-generator)
-- [4. Deploying](#4-deploying)
-- [5. Other scripts](#5-other-scripts)
-- [6. Examples](#6-examples)
-  - [6.1. Good examples](#61-good-examples)
-  - [6.2. Bad examples](#62-bad-examples)
+- [3. Image rules](#3-image-rules)
+- [4. Generating new tag images with Gemini](#4-generating-new-tag-images-with-gemini)
+  - [4.1. Install dependencies](#41-install-dependencies)
+  - [4.2. Set up your Gemini API key](#42-set-up-your-gemini-api-key)
+  - [4.3. Run the generator](#43-run-the-generator)
+- [5. Deploying](#5-deploying)
+- [6. Other scripts](#6-other-scripts)
+- [7. Examples](#7-examples)
+  - [7.1. Good examples](#71-good-examples)
+  - [7.2. Bad examples](#72-bad-examples)
 
 # 1. About this repo
 
@@ -52,15 +53,25 @@ To contribute:
    - **Compressed** — ideally run through something like [tinypng.com](https://tinypng.com/) before submitting.
 4. Open a pull request with your changes.
 
-# 3. Generating new tag images with Gemini
+# 3. Image rules
 
-## 3.1. Install dependencies
+- No text, logos, or watermarks.
+- No frames or borders around images.
+- No nudity or sexual content.
+- No gore or graphic violence.
+- No content that could be considered offensive or insensitive.
+
+Some of the above rules are subjective, and existing images in the repo may not fully comply with them. These rules are intended to guide future contributions, and to help ensure that the images are suitable for a wide audience. If you see any images that violate these rules, please open an issue to report them or submit a suitable replacement image.
+
+# 4. Generating new tag images with Gemini
+
+## 4.1. Install dependencies
 
 ```bash
 npm install
 ```
 
-## 3.2. Set up your Gemini API key
+## 4.2. Set up your Gemini API key
 
 ```bash
 cp .env.sample .env.local
@@ -74,7 +85,7 @@ GEMINI_API_KEY=YourGeminiAPIKey
 
 Get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
 
-## 3.3. Run the generator
+## 4.3. Run the generator
 
 ```bash
 npm run tags:generate
@@ -87,7 +98,7 @@ anything missing from a previous run (e.g. after adding new tags, or if a reques
 All generator config — the AI prompt, output dimensions, reference image folders, rate limiting, etc. — lives in the
 `CONFIG` block at the top of `lib/tagImageGenerator.ts`.
 
-# 4. Deploying
+# 5. Deploying
 
 This repo deploys to Vercel as a static site (no build step). `vercel.json` and `.vercelignore` scope the deploy to
 just `assets/` and `data/tags.json`, so once deployed, assets and the tags list are reachable at:
@@ -97,7 +108,7 @@ https://assets.chromatix.app/assets/tags/community/<slug>.jpg
 https://assets.chromatix.app/data/tags.json
 ```
 
-# 5. Other scripts
+# 6. Other scripts
 
 - `npm run knip` — run [knip](https://knip.dev/)
 - `npm run lint` / `npm run lint:fix` — ESLint
@@ -105,12 +116,12 @@ https://assets.chromatix.app/data/tags.json
 - `npm run typecheck` — TypeScript, no emit
 - `npm run check` — knip + lint + prettier + typecheck
 
-# 6. Examples
+# 7. Examples
 
 Some of the generated images are good. Some are ok. Many are terrible. Most are purple for some reason. Hopefully nothing in here is in any way insensitive or offensive, but if you see anything that is, please let us know.
 
 The main goal is to have a set of good and somewhat consistent images for every tag. Preferably fairly simple and identifiable at a glance, with a good variety of different colours used as appropriate. Below are some examples of the better ones, and some of the worst ones, to give a sense of the aims and the current state of the generator.
 
-## 6.1. Good examples
+## 7.1. Good examples
 
-## 6.2. Bad examples
+## 7.2. Bad examples
