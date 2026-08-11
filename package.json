@@ -6,6 +6,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "tags:fetch": "node lib/tagFetcher.ts",
     "tags:generate": "node lib/tagImageGenerator.ts",
     "knip": "knip",
     "lint": "eslint . --cache",
