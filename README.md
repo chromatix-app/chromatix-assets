@@ -29,7 +29,7 @@ When browsing your music library in Chromatix, you can browse by tags such as ge
 
 Tags are essentially unlimited as people can tag items however they want, but anonymised usage data has allowed many tags in use to be collated here in `data/tags.json`. Some tags are already very niche, bizarre, or badly formatted, but they're taken from legitimate usage of the app.
 
-The sheer number of tags made manual curation unfeasible, but batch-generated AI images are a practical alternative. That does mean lots of the images are poor quality, but the goal is to have something for every tag.
+The sheer number of tags made manual curation unfeasible, but batch-generated AI images are a practical alternative. That does mean many of the images are poor quality, but the goal is to have something for every tag.
 
 This repo is open for the community to contribute to improving the images. Submitted images can be created manually, via the bundled generator, or however else you like.
 
