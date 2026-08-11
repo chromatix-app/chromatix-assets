@@ -114,6 +114,12 @@ punctuation) — the generator doesn't currently dedupe against this, so the lat
 existing file and be skipped. This has come up before as "why did some tags never generate" - check for a slug
 collision with an already-generated tag before assuming it's an API failure.
 
+`slugifyTagName` strips accents/diacritics but has no transliteration for non-Latin scripts (Cyrillic, CJK, etc.), so
+a tag made up entirely of such characters slugifies to an empty string. The generator explicitly skips any tag whose
+slug is empty rather than writing to `assets/tags/community/.jpg`, which every such tag would otherwise collide on.
+Prefer keeping non-Latin tags out of `data/tags.json` entirely via `data/tags-ignored.json` (see
+[Tag Fetching](#tag-fetching)) - the empty-slug skip is a safety net, not the primary way to exclude them.
+
 ## Key Scripts
 
 - `npm run tags:fetch` — fetch tags from the Chromatix API and merge them into `data/tags.json`
