@@ -5,9 +5,11 @@
 `chromatix-assets` is an image asset repository for Chromatix, holding thumbnail images for community tags (genres,
 moods, styles). It's a standalone Node/TypeScript project with its own `package.json` and dependencies.
 
-Images can be added to `assets/tags/community/` by hand. The project also includes an optional script
-(`lib/tagImageGenerator.ts`) that generates new tag thumbnails via the Gemini API, for cases where that's more
-practical than sourcing or creating images manually — see [Tag Image Generation](#tag-image-generation) below.
+Images can be added to `assets/tags/community/` by hand. The project also includes two optional scripts:
+`lib/tagFetcher.ts`, which pulls the current tag list from the Chromatix API into `data/tags.json` (see
+[Tag Fetching](#tag-fetching) below), and `lib/tagImageGenerator.ts`, which generates new tag thumbnails via the
+Gemini API for cases where that's more practical than sourcing or creating images manually (see
+[Tag Image Generation](#tag-image-generation) below).
 
 ## Tech Stack
 
@@ -23,6 +25,7 @@ practical than sourcing or creating images manually — see [Tag Image Generatio
 ```
 data/
   tags.json                  # Source list of tag names to generate images for
+  tags-ignored.json          # Tags to always drop from tags.json, even if the API returns them
 references/
   tags/
     community/
@@ -37,9 +40,22 @@ assets/
     community/
       <slug>.jpg               # Generated output, one per tag
 lib/
+  tagFetcher.ts                 # Fetches tags from the Chromatix API into tags.json
   tagImageGenerator.ts          # Main generator script - all config lives in the CONFIG block at its top
   slugifyTagName.ts             # Tag name -> filename slug helper
 ```
+
+## Tag Fetching
+
+`lib/tagFetcher.ts` fetches the current tag list from the Chromatix API (`CONFIG.apiUrl`, authenticated with the
+`X-Api-Key` header from `TAGS_API_KEY`, plus a required `Origin` header from `TAGS_API_ORIGIN` - the API rejects
+requests with a 403 if it's missing) and merges the result into `CONFIG.tagsFile` (`data/tags.json`), keeping the
+file alphabetised (case-insensitive) with no duplicates. `CONFIG.ignoredTagsFile` (`data/tags-ignored.json`) is a
+list of tags to drop even if the API returns them (e.g. `"_"`, a placeholder value present in the live tag set) -
+kept as data alongside `tags.json` rather than hardcoded in the script, so it can be edited without touching code.
+
+The merge only ever adds tags — it never removes a tag already in `data/tags.json`, even if the API stops returning
+it, so manually-curated entries aren't lost.
 
 ## Tag Image Generation
 
@@ -98,8 +114,15 @@ punctuation) — the generator doesn't currently dedupe against this, so the lat
 existing file and be skipped. This has come up before as "why did some tags never generate" - check for a slug
 collision with an already-generated tag before assuming it's an API failure.
 
+`slugifyTagName` strips accents/diacritics but has no transliteration for non-Latin scripts (Cyrillic, CJK, etc.), so
+a tag made up entirely of such characters slugifies to an empty string. The generator explicitly skips any tag whose
+slug is empty rather than writing to `assets/tags/community/.jpg`, which every such tag would otherwise collide on.
+Prefer keeping non-Latin tags out of `data/tags.json` entirely via `data/tags-ignored.json` (see
+[Tag Fetching](#tag-fetching)) - the empty-slug skip is a safety net, not the primary way to exclude them.
+
 ## Key Scripts
 
+- `npm run tags:fetch` — fetch tags from the Chromatix API and merge them into `data/tags.json`
 - `npm run tags:generate` — run the generator against `data/tags.json`
 - `npm run lint` / `npm run lint:fix` — ESLint
 - `npm run prettier` / `npm run prettier:fix` — Prettier
@@ -114,6 +137,9 @@ collision with an already-generated tag before assuming it's an API failure.
   quota limits that a full run can hit; a paid plan removes most of that friction (this is why
   `CONFIG.requestDelayMs` is low by default - it assumes a paid plan; lower it further at your own risk, or raise it
   back up if running on the free tier).
+- `TAGS_API_URL` / `TAGS_API_KEY` / `TAGS_API_ORIGIN` — endpoint, API key, and required `Origin` header value for
+  the Chromatix tags API, only required if using the optional fetcher script. Set in `.env` or `.env.local` (see
+  `.env.sample`).
 
 ## Deployment
 

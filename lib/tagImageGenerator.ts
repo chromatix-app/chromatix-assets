@@ -240,7 +240,17 @@ async function processTags(): Promise<void> {
       break;
     }
 
-    const outputPath = path.join(CONFIG.outputDir, `${slugifyTagName(tag)}.jpg`);
+    const slug = slugifyTagName(tag);
+
+    // Tags with no Latin/ASCII-alphanumeric characters (e.g. Cyrillic, CJK) slugify to an empty
+    // string, which would collide with every other such tag on the same output filename ("<empty>.jpg")
+    if (!slug) {
+      console.log(chalk.yellow(`- ${tag} (slugifies to an empty string, skipping)`));
+      skipped += 1;
+      continue;
+    }
+
+    const outputPath = path.join(CONFIG.outputDir, `${slug}.jpg`);
 
     // Never regenerate a tag that already has an output file
     if (fs.existsSync(outputPath)) {
