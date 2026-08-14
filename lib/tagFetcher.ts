@@ -3,8 +3,8 @@
 // ======================================================================
 //
 // Fetches the current tag list from the Chromatix API and merges it into CONFIG.tagsFile, keeping the
-// file alphabetised with no duplicates. Tags listed in CONFIG.ignoredTagsFile are dropped even if the
-// API returns them.
+// file alphabetised with no duplicates. Tags listed in CONFIG.ignoredTagsFile, or outside the
+// CONFIG.minTagLength/maxTagLength range, are dropped even if the API returns them.
 //
 // Usage: npm run tags:fetch
 
@@ -31,6 +31,12 @@ const CONFIG = {
 
   // Tags to always exclude from the output file, even if the API returns them
   ignoredTagsFile: './data/tags-ignored.json',
+
+  // Minimum tag length
+  minTagLength: 2,
+
+  // Maximum tag length
+  maxTagLength: 128,
 };
 
 // ======================================================================
@@ -66,14 +72,16 @@ async function fetchTags(): Promise<string[]> {
   return data.tags;
 }
 
-// Merges fetchedTags into the existing tags file, excluding ignoredTags, deduplicating, and sorting
-// alphabetically (case-insensitive).
+// Merges fetchedTags into the existing tags file, excluding ignoredTags and tags outside the
+// CONFIG.minTagLength/maxTagLength range, deduplicating, and sorting alphabetically (case-insensitive).
 function mergeTags(existingTags: string[], fetchedTags: string[], ignoredTags: string[]): string[] {
   const excluded = new Set(ignoredTags.map((tag) => tag.toLowerCase()));
   const merged = new Set(existingTags);
 
   for (const tag of fetchedTags) {
-    if (!excluded.has(tag.toLowerCase())) {
+    const hasValidLength = tag.length >= CONFIG.minTagLength && tag.length <= CONFIG.maxTagLength;
+
+    if (hasValidLength && !excluded.has(tag.toLowerCase())) {
       merged.add(tag);
     }
   }

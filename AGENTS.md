@@ -53,6 +53,9 @@ requests with a 403 if it's missing) and merges the result into `CONFIG.tagsFile
 file alphabetised (case-insensitive) with no duplicates. `CONFIG.ignoredTagsFile` (`data/tags-ignored.json`) is a
 list of tags to drop even if the API returns them (e.g. `"_"`, a placeholder value present in the live tag set) -
 kept as data alongside `tags.json` rather than hardcoded in the script, so it can be edited without touching code.
+`CONFIG.minTagLength` / `CONFIG.maxTagLength` additionally drop any tag outside that character-length range, which
+filters out single-character noise (e.g. stray `"A"`, `"à"`) without needing every one of them listed
+in `ignoredTagsFile`.
 
 The merge only ever adds tags — it never removes a tag already in `data/tags.json`, even if the API stops returning
 it, so manually-curated entries aren't lost.
