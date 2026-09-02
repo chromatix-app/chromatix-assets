@@ -25,7 +25,6 @@ Gemini API for cases where that's more practical than sourcing or creating image
 ```
 data/
   tags.json                  # Source list of tag names to generate images for
-  tags-ignored.json          # Tags to always drop from tags.json, even if the API returns them
 references/
   tags/
     community/
@@ -42,6 +41,8 @@ assets/
 lib/
   tagFetcher.ts                 # Fetches tags from the Chromatix API into tags.json
   tagImageGenerator.ts          # Main generator script - all config lives in the CONFIG block at its top
+  isValidTag.ts                 # Decides whether a fetched tag is worth keeping
+  isValidTag.test.ts            # Unit tests for isValidTag
   slugifyTagName.ts             # Tag name -> filename slug helper
 ```
 
@@ -50,12 +51,26 @@ lib/
 `lib/tagFetcher.ts` fetches the current tag list from the Chromatix API (`CONFIG.apiUrl`, authenticated with the
 `X-Api-Key` header from `TAGS_API_KEY`, plus a required `Origin` header from `TAGS_API_ORIGIN` - the API rejects
 requests with a 403 if it's missing) and merges the result into `CONFIG.tagsFile` (`data/tags.json`), keeping the
-file alphabetised (case-insensitive) with no duplicates. `CONFIG.ignoredTagsFile` (`data/tags-ignored.json`) is a
-list of tags to drop even if the API returns them (e.g. `"_"`, a placeholder value present in the live tag set) -
-kept as data alongside `tags.json` rather than hardcoded in the script, so it can be edited without touching code.
-`CONFIG.minTagLength` / `CONFIG.maxTagLength` additionally drop any tag outside that character-length range, which
-filters out single-character noise (e.g. stray `"A"`, `"à"`) without needing every one of them listed
-in `ignoredTagsFile`.
+file alphabetised (case-insensitive) with no duplicates.
+
+Every fetched tag is passed through `isValidTag` (`lib/isValidTag.ts`) before being added, so junk in the API's tag
+set is filtered out algorithmically rather than via a manually-maintained ignore list:
+
+- Outside `CONFIG.minTagLength`/`maxTagLength` (2-128 chars) - drops single-character noise (e.g. stray `"A"`, `"_"`)
+  and absurdly long garbage strings.
+- Purely numeric (e.g. `"13"`) - a bare number isn't a meaningful genre/mood/style tag on its own.
+- Fully wrapped in one pair of brackets/parens/braces/angle-brackets (e.g. `"(255)"`, `"<Unknown>"`) - these are
+  placeholder/metadata-fallback values, not real tag names. A real tag merely containing brackets (e.g.
+  `"Ambient (Chill)"`) isn't fully wrapped, so it's unaffected.
+- Domain/URL-like (e.g. `"www.TopMusic.rs"`, `"©CNHiFi.COM"`) - matched via a regex for a `word.tld`-shaped substring,
+  which catches website-plug spam without needing every instance listed individually.
+- Has no Latin letters or digits once diacritics are stripped - rules out tags made up entirely of non-Latin scripts
+  (Cyrillic, CJK, Hangul, etc.), which `slugifyTagName` has no transliteration for. Checked directly rather than via
+  `slugifyTagName`, since that function replaces `"&"` with the literal word "and", which would otherwise let a tag
+  like `"Фильмы & Игры"` (Cyrillic only, plus punctuation) slip through.
+
+`isValidTag` has unit tests in `lib/isValidTag.test.ts` (run via `npm test`) - extend these when a new class of junk
+tag turns up in the API's data rather than reaching for a one-off ignore list.
 
 The merge only ever adds tags — it never removes a tag already in `data/tags.json`, even if the API stops returning
 it, so manually-curated entries aren't lost.
@@ -120,8 +135,8 @@ collision with an already-generated tag before assuming it's an API failure.
 `slugifyTagName` strips accents/diacritics but has no transliteration for non-Latin scripts (Cyrillic, CJK, etc.), so
 a tag made up entirely of such characters slugifies to an empty string. The generator explicitly skips any tag whose
 slug is empty rather than writing to `assets/tags/community/.jpg`, which every such tag would otherwise collide on.
-Prefer keeping non-Latin tags out of `data/tags.json` entirely via `data/tags-ignored.json` (see
-[Tag Fetching](#tag-fetching)) - the empty-slug skip is a safety net, not the primary way to exclude them.
+`isValidTag` (see [Tag Fetching](#tag-fetching)) already keeps such tags out of `data/tags.json` at fetch time - the
+empty-slug skip here is a safety net, not the primary way to exclude them.
 
 ## Key Scripts
 
@@ -130,7 +145,8 @@ Prefer keeping non-Latin tags out of `data/tags.json` entirely via `data/tags-ig
 - `npm run lint` / `npm run lint:fix` — ESLint
 - `npm run prettier` / `npm run prettier:fix` — Prettier
 - `npm run typecheck` — TypeScript, no emit
-- `npm run check` — lint + prettier + typecheck
+- `npm run test` — Vitest unit tests
+- `npm run check` — knip + lint + prettier + typecheck + test
 
 ## Environment Variables
 

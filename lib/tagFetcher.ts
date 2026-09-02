@@ -3,14 +3,16 @@
 // ======================================================================
 //
 // Fetches the current tag list from the Chromatix API and merges it into CONFIG.tagsFile, keeping the
-// file alphabetised with no duplicates. Tags listed in CONFIG.ignoredTagsFile, or outside the
-// CONFIG.minTagLength/maxTagLength range, are dropped even if the API returns them.
+// file alphabetised with no duplicates. Tags that fail isValidTag (see lib/isValidTag.ts) are dropped
+// even if the API returns them.
 //
 // Usage: npm run tags:fetch
 
 import chalk from 'chalk';
 import dotenv from 'dotenv';
 import fs from 'fs';
+
+import { isValidTag } from './isValidTag.ts';
 
 dotenv.config({ path: '.env' });
 dotenv.config({ path: '.env.local', override: true });
@@ -29,13 +31,8 @@ const CONFIG = {
   // Output file to merge fetched tags into
   tagsFile: './data/tags.json',
 
-  // Tags to always exclude from the output file, even if the API returns them
-  ignoredTagsFile: './data/tags-ignored.json',
-
-  // Minimum tag length
+  // Length bounds passed to isValidTag - see lib/isValidTag.ts
   minTagLength: 2,
-
-  // Maximum tag length
   maxTagLength: 128,
 };
 
@@ -72,16 +69,13 @@ async function fetchTags(): Promise<string[]> {
   return data.tags;
 }
 
-// Merges fetchedTags into the existing tags file, excluding ignoredTags and tags outside the
-// CONFIG.minTagLength/maxTagLength range, deduplicating, and sorting alphabetically (case-insensitive).
-function mergeTags(existingTags: string[], fetchedTags: string[], ignoredTags: string[]): string[] {
-  const excluded = new Set(ignoredTags.map((tag) => tag.toLowerCase()));
+// Merges fetchedTags into the existing tags file, excluding any tag that fails isValidTag, deduplicating,
+// and sorting alphabetically (case-insensitive).
+function mergeTags(existingTags: string[], fetchedTags: string[]): string[] {
   const merged = new Set(existingTags);
 
   for (const tag of fetchedTags) {
-    const hasValidLength = tag.length >= CONFIG.minTagLength && tag.length <= CONFIG.maxTagLength;
-
-    if (hasValidLength && !excluded.has(tag.toLowerCase())) {
+    if (isValidTag(tag, { minLength: CONFIG.minTagLength, maxLength: CONFIG.maxTagLength })) {
       merged.add(tag);
     }
   }
@@ -108,9 +102,8 @@ async function main(): Promise<void> {
   }
 
   const existingTags: string[] = JSON.parse(fs.readFileSync(CONFIG.tagsFile, 'utf-8'));
-  const ignoredTags: string[] = JSON.parse(fs.readFileSync(CONFIG.ignoredTagsFile, 'utf-8'));
   const fetchedTags = await fetchTags();
-  const mergedTags = mergeTags(existingTags, fetchedTags, ignoredTags);
+  const mergedTags = mergeTags(existingTags, fetchedTags);
 
   fs.writeFileSync(CONFIG.tagsFile, `${JSON.stringify(mergedTags, null, 2)}\n`);
 
