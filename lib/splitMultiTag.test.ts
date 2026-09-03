@@ -6,6 +6,7 @@ const options = {
   separators: [',', '|', '/', '+', '_', ':', ';'],
   connectors: ['&', 'and', 'y', 'et', 'und', 'e'],
   protectedTags: ['drum & bass', 'drum and bass', 'rhythm & blues', 'rock & roll', 'rock and roll'],
+  distributiveHeads: ['metal', 'rock', 'punk', 'house', 'blues', 'jazz', 'techno', 'trance', 'hardcore'],
 };
 
 describe('splitMultiTag', () => {
@@ -50,5 +51,36 @@ describe('splitMultiTag', () => {
       'Electronic',
     ]);
     expect(splitMultiTag('Dream Pop, Shoegaze,', options)).toEqual(['Dream Pop', 'Shoegaze']);
+  });
+
+  it('distributes a trailing head word onto earlier single-word parts', () => {
+    expect(splitMultiTag('Death & Black Metal', options)).toEqual(['Death Metal', 'Black Metal']);
+    expect(splitMultiTag('Heavy & Power & Speed Metal', options)).toEqual([
+      'Heavy Metal',
+      'Power Metal',
+      'Speed Metal',
+    ]);
+    expect(splitMultiTag('Indie & Experimental Rock', options)).toEqual(['Indie Rock', 'Experimental Rock']);
+  });
+
+  it('does not distribute a head word that is not configured', () => {
+    expect(splitMultiTag('Ambient & New Age', options)).toEqual(['Ambient', 'New Age']);
+  });
+
+  it('does not distribute when the last part is a single word', () => {
+    expect(splitMultiTag('Rock & Pop', options)).toEqual(['Rock', 'Pop']);
+    expect(splitMultiTag('Garage Rock & Punk', options)).toEqual(['Garage Rock', 'Punk']);
+  });
+
+  it('does not distribute when an earlier part is multi-word', () => {
+    expect(splitMultiTag('Blue-Eyed Soul & Jazz Fusion & Alternative Rock', options)).toEqual([
+      'Blue-Eyed Soul',
+      'Jazz Fusion',
+      'Alternative Rock',
+    ]);
+  });
+
+  it('does not distribute across a protected phrase', () => {
+    expect(splitMultiTag('Drum & Bass & Hip Hop', options)).toEqual(['Drum & Bass', 'Hip Hop']);
   });
 });

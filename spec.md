@@ -20,14 +20,15 @@ growing with junk. Constraints:
   image", junk that isn't structurally detectable), a human/LLM records the decision once in
   `data/3-tags-curated.json`. Everything else is derived.
 
-## 2. Facts (measured 2026-09-03 after the rules rework — re-measure, don't trust)
+## 2. Facts (measured 2026-09-03 after the distributive-head split + fragment exclusion — re-measure, don't trust)
 
-- `data/1-tags-raw.json`: 2,574 raw strings → `data/2-candidates.json`: 2,577 slugs, 440 compounds.
-- Resolved: **1,712 canonical** (own image), 730 sharing another tag's image, 135 junk. Down from 2,066 canonical
-  under the previous "everything with an image is canonical" curation.
+- `data/1-tags-raw.json`: 2,574 raw strings → `data/2-candidates.json`: 2,583 slugs, 424 compounds.
+- Resolved: **1,637 canonical** (own image), 728 sharing another tag's image, 134 junk, 84 unreferenced split
+  fragments excluded from the map entirely (never a raw tag, and nothing else resolves to them - see §3.3
+  "Compound"). Down from 1,712 canonical before the distributive-head/fragment-exclusion rework.
 - `data/3-tags-curated.json` (exceptions only): 97 canonical entries (name overrides, pins, alias/related
   targets), 135 junk.
-- 400 canonical slugs have no image yet (`tags:generate` queue). 71 existing images are for slugs that are no
+- 325 canonical slugs have no image yet (`tags:generate` queue). 73 existing images are for slugs that are no
   longer canonical (orphans - report only, delete in a reviewed commit).
 - The app resolves `slugifyTagName(tag)` → `<slug>.jpg` with a fallback image on load error; it does not fetch
   JSON yet. The API returns tag names only (no counts, no genre/mood/style field).
@@ -70,10 +71,24 @@ image to its sharing slugs so they work under the current filename-only lookup.
    while the remainder is a known tag; the tag then shares the remainder's image (`classic-rock` → `rock`,
    `acoustic-music` → `acoustic`). Only listed words are ever stripped - `death-metal` stays `death-metal`.
 4. **Compound** (`2-candidates.json` parts): a tag that split into several shares its primary part's image
-   (`lib/selectPrimaryTag.ts`: first part not led by a modifier); a junk part is skipped; all-junk → junk.
+   (`lib/selectPrimaryTag.ts`: first part not led by a modifier); a junk part is skipped; all-junk → junk. A
+   part that only ever exists as a split fragment (never a raw tag - `raw: false` in `2-candidates.json`)
+   is preferred last, after every real (raw) part, so a compound never anchors on a bare fragment when a
+   genuine tag is available among its parts.
 5. Otherwise **canonical**: its own image.
 
 Every rule that points at another slug resolves that slug recursively, so chains and overrides compose.
+
+Distributive splitting (`lib/splitMultiTag.ts`, `config/delimiters.json` `"distributiveHeads"`): a raw tag
+like "Death & Black Metal" means "Death Metal & Black Metal", not "Death" + "Black Metal" - splitting it
+naively would strand "death" as a bare fragment. When the final split part ends in a listed head word
+("metal", "rock", ...) and every earlier part is a single word not already ending in that head, the head is
+appended to each earlier part before the parts are used as compound candidates ("Death & Black Metal" ->
+["Death Metal", "Black Metal"]; "Heavy & Power & Speed Metal" -> ["Heavy Metal", "Power Metal", "Speed
+Metal"]). `lib/buildCandidates.ts` records, per slug, whether it was ever seen as a raw tag string
+(`raw: true`) or only ever as a split part (`raw: false`); `buildResolvedMap` drops a canonical slug that is
+`raw: false` and that no other slug's resolution targets - an unreferenced fragment is excluded from
+`4-tags-resolved.json` entirely rather than becoming its own generated image.
 
 ### 3.4 Scripts
 

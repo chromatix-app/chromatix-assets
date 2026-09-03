@@ -5,6 +5,9 @@ export type SplitOptions = {
   connectors: string[];
   // Phrases that contain a connector as part of their own name and must never be split, e.g. "drum & bass"
   protectedTags: string[];
+  // Single words (e.g. "metal", "rock") that, when they're the final word of the last split part, get
+  // distributed onto every earlier single-word part - "Death & Black Metal" -> ["Death Metal", "Black Metal"]
+  distributiveHeads: string[];
 };
 
 // Stands in for whitespace inside a protected phrase while splitting. Connectors only split when
@@ -30,14 +33,55 @@ function protect(tag: string, protectedTags: string[]): string {
   return result;
 }
 
+// Distributive-head rule: "Death & Black Metal" -> ["Death Metal", "Black Metal"]. Applied when there are
+// >= 2 parts and the final part has >= 2 words whose last word (case-insensitively) is a listed head, AND
+// every earlier part is a single word that doesn't already end with that head - otherwise parts are left
+// untouched ("Ambient & New Age": "Age" isn't a head; "Rock & Pop": last part is one word; "Blue-Eyed Soul
+// & Jazz Fusion & Alternative Rock": earlier parts are multi-word).
+function applyDistributiveHead(parts: string[], distributiveHeads: string[]): string[] {
+  if (parts.length < 2) {
+    return parts;
+  }
+
+  const heads = new Set(distributiveHeads.map((head) => head.toLowerCase()));
+  const last = parts[parts.length - 1];
+  const lastWords = last.trim().split(/\s+/);
+
+  if (lastWords.length < 2) {
+    return parts;
+  }
+
+  const head = lastWords[lastWords.length - 1];
+
+  if (!heads.has(head.toLowerCase())) {
+    return parts;
+  }
+
+  const earlierParts = parts.slice(0, -1);
+  const allEligible = earlierParts.every((part) => {
+    const words = part.trim().split(/\s+/);
+
+    return words.length === 1 && words[0].toLowerCase() !== head.toLowerCase();
+  });
+
+  if (!allEligible) {
+    return parts;
+  }
+
+  return [...earlierParts.map((part) => `${part} ${head}`), last];
+}
+
 /**
  * Splits a raw tag string that joins several tags into its parts, using the separators/connectors from
  * config/delimiters.json ("Ambient & New Age", "Rock, Pop", "Metal | Deathcore", "Rock y Alternativo").
  * Connectors only split when surrounded by whitespace, so "R&B" is one tag. Phrases in
  * config/compound-tags.json survive intact even inside a longer list ("Drum & Bass & UK Garage" ->
- * ["Drum & Bass", "UK Garage"]). Returns the original string as a single-element array if nothing splits.
+ * ["Drum & Bass", "UK Garage"]). After splitting, a distributive head from config/delimiters.json
+ * ("metal", "rock", ...) named by the last part ("Death & Black Metal") is appended to every earlier
+ * single-word part, so "Death" doesn't become its own bare fragment: ["Death Metal", "Black Metal"].
+ * Returns the original string as a single-element array if nothing splits.
  * @param tag - The raw tag string
- * @param options - Separators, connectors and protected phrases (see lib/config.ts)
+ * @param options - Separators, connectors, protected phrases and distributive heads (see lib/config.ts)
  * @returns One or more trimmed, non-empty parts
  */
 export function splitMultiTag(tag: string, options: SplitOptions): string[] {
@@ -62,5 +106,9 @@ export function splitMultiTag(tag: string, options: SplitOptions): string[] {
     .map((part) => part.replaceAll(PROTECTED_SPACE, ' ').trim())
     .filter((part) => part.length > 0);
 
-  return parts.length > 1 ? parts : [tag];
+  if (parts.length <= 1) {
+    return [tag];
+  }
+
+  return applyDistributiveHead(parts, options.distributiveHeads);
 }

@@ -7,7 +7,7 @@ import { type Candidates, buildResolvedMap, createResolver } from './resolveTag.
 const config: PipelineConfig = {
   blocklist: [],
   modifiers: { prefix: ['classic', 'general'], suffix: ['music'] },
-  delimiters: { separators: [','], connectors: ['&', 'and'] },
+  delimiters: { separators: [','], connectors: ['&', 'and'], distributiveHeads: ['metal'] },
   compoundTags: [],
 };
 
@@ -95,6 +95,22 @@ describe('createResolver', () => {
     const withJunk = createResolver(candidates, { canonical: {}, junk: ['misc', 'rock'] }, config);
 
     expect(withJunk.resolve('misc-and-rock').kind).toBe('junk');
+  });
+
+  it('prefers a raw part over a fragment primary when sharing a compound image', () => {
+    const withFragmentPrimary: Candidates = {
+      ...candidates,
+      'death-and-black-metal': {
+        variants: ['Death & Black Metal'],
+        parts: ['death', 'black-metal'],
+        primary: 'death',
+      },
+      death: { variants: ['Death'], raw: false },
+      'black-metal': { variants: ['Black Metal'], raw: true },
+    };
+    const r = createResolver(withFragmentPrimary, noExceptions, config);
+
+    expect(r.resolve('death-and-black-metal')).toEqual({ kind: 'alias', target: 'black-metal', via: 'compound' });
   });
 });
 
@@ -189,5 +205,27 @@ describe('buildResolvedMap', () => {
     expect(map['rock-and-pop']).toBe('rock');
     expect(map['misc-and-rock']).toBe('rock');
     expect(map).not.toHaveProperty('misc');
+  });
+
+  it('excludes an unreferenced fragment but keeps one another slug resolves to', () => {
+    const withFragments: Candidates = {
+      ...candidates,
+      // "death" only ever appeared as a split part and nothing points at it - must not appear in the map.
+      death: { variants: ['Death'], raw: false },
+      // "black-metal" is also a fragment-only slug, but "death-and-black-metal" resolves to it (it's the
+      // primary), so it stays in the map.
+      'black-metal': { variants: ['Black Metal'], raw: false },
+      'death-and-black-metal': {
+        variants: ['Death & Black Metal'],
+        parts: ['death', 'black-metal'],
+        primary: 'black-metal',
+      },
+    };
+    const resolver = createResolver(withFragments, noExceptions, config);
+    const map = buildResolvedMap(withFragments, resolver);
+
+    expect(map).not.toHaveProperty('death');
+    expect(map['black-metal']).toBe('black-metal');
+    expect(map['death-and-black-metal']).toBe('black-metal');
   });
 });

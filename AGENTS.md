@@ -28,7 +28,7 @@ deliberately deferred. This file documents how the code works today. Keep both c
 ```
 config/                    # EVERY word list lives here, never in code. Each file has a "description".
   blocklist.json           # Strings dropped before anything else ("Misc", "Test") - compared by slug
-  delimiters.json          # Separators and whitespace-bounded connectors that split a multi-tag string
+  delimiters.json          # Separators/connectors that split a multi-tag string + distributive head words
   compound-tags.json       # "X & Y" names that must NOT be split ("drum & bass", "rock & roll")
   modifiers.json           # Prefix/suffix words stripped to find the tag whose image to share
 data/

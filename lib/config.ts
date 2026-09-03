@@ -14,7 +14,7 @@ const CONFIG_DIR = './config';
 export type PipelineConfig = {
   blocklist: string[];
   modifiers: { prefix: string[]; suffix: string[] };
-  delimiters: { separators: string[]; connectors: string[] };
+  delimiters: { separators: string[]; connectors: string[]; distributiveHeads: string[] };
   compoundTags: string[];
 };
 
@@ -38,7 +38,9 @@ function assertStringArray(value: unknown, where: string): string[] {
 export function loadConfig(): PipelineConfig {
   const blocklist = readJson<{ tags: unknown }>('blocklist.json');
   const modifiers = readJson<{ prefix: unknown; suffix: unknown }>('modifiers.json');
-  const delimiters = readJson<{ separators: unknown; connectors: unknown }>('delimiters.json');
+  const delimiters = readJson<{ separators: unknown; connectors: unknown; distributiveHeads: unknown }>(
+    'delimiters.json'
+  );
   const compoundTags = readJson<{ tags: unknown }>('compound-tags.json');
 
   return {
@@ -50,6 +52,7 @@ export function loadConfig(): PipelineConfig {
     delimiters: {
       separators: assertStringArray(delimiters.separators, 'config/delimiters.json "separators"'),
       connectors: assertStringArray(delimiters.connectors, 'config/delimiters.json "connectors"'),
+      distributiveHeads: assertStringArray(delimiters.distributiveHeads, 'config/delimiters.json "distributiveHeads"'),
     },
     compoundTags: assertStringArray(compoundTags.tags, 'config/compound-tags.json "tags"'),
   };

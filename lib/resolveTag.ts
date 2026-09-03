@@ -14,9 +14,13 @@
 //      fewest-hyphen one
 //   3. modifiers: strip a config prefix ("classic-rock" -> "rock") or suffix ("acoustic-music" ->
 //      "acoustic") when the remainder is a known tag; the tag then shares the remainder's image
-//   4. compound: a tag that split into parts shares its primary part's image (next part if that's junk)
+//   4. compound: a tag that split into parts shares its primary part's image (next part if that's junk),
+//      preferring a real (raw) part over one that only exists as a split fragment
 //   5. otherwise the tag is canonical - its own image
 // Every rule that maps to another slug resolves that slug recursively, so chains and overrides compose.
+// buildResolvedMap additionally drops any slug that resolved to canonical, is itself only a split
+// fragment (never a raw tag), and that no other slug's resolution targets - an unreferenced fragment never
+// becomes an image to generate.
 
 import { type CuratedTags } from './curatedTags.ts';
 import { type PipelineConfig } from './config.ts';
@@ -25,7 +29,8 @@ import { type PipelineConfig } from './config.ts';
 // TYPES
 // ======================================================================
 
-type CandidateEntry = { variants: string[]; parts?: string[]; primary?: string };
+// raw is optional so fixtures/tests that don't set it keep working - missing is treated as true (a real tag).
+type CandidateEntry = { variants: string[]; raw?: boolean; parts?: string[]; primary?: string };
 export type Candidates = Record<string, CandidateEntry>;
 
 type ResolutionKind = 'canonical' | 'alias' | 'related' | 'junk';
@@ -162,17 +167,16 @@ export function createResolver(candidates: Candidates, curated: CuratedTags, con
       }
     }
 
-    // 4. Compound
+    // 4. Compound - prefer a real (raw) part's image over a part that only exists as a split fragment, so
+    // a compound never anchors itself on a bare fragment when a genuine tag is available among its parts.
     const entry = candidates[slug];
 
     if (entry?.parts && entry.parts.length > 1) {
       const ordered = [entry.primary, ...entry.parts].filter((part): part is string => part !== undefined);
+      const candidateParts = [...new Set(ordered)].filter((part) => part !== slug);
+      const isRaw = (part: string) => candidates[part]?.raw !== false;
 
-      for (const part of new Set(ordered)) {
-        if (part === slug) {
-          continue;
-        }
-
+      for (const part of [...candidateParts.filter(isRaw), ...candidateParts.filter((part) => !isRaw(part))]) {
         const resolved = resolve(part);
 
         if (resolved.kind !== 'junk') {
@@ -218,6 +222,9 @@ export function createResolver(candidates: Candidates, curated: CuratedTags, con
 /**
  * Resolves every candidate slug and returns the flat runtime map deployed as data/4-tags-resolved.json:
  * each non-junk slug -> the canonical slug whose image it shows (canonical slugs map to themselves).
+ * A slug that resolved to canonical but only ever appeared as a split fragment (`raw === false`), and that
+ * no other slug's resolution points at, is an unreferenced fragment - it's dropped from the map entirely
+ * (never gets an image) rather than kept as an accidental canonical tag.
  * @param candidates - Every known tag slug (data/2-candidates.json)
  * @param resolver - A resolver from createResolver
  * @returns The map, keys sorted case-insensitively
@@ -230,6 +237,17 @@ export function buildResolvedMap(candidates: Candidates, resolver: Resolver): Re
 
     if (resolution.target) {
       map[slug] = resolution.target;
+    }
+  }
+
+  const referencedTargets = new Set(Object.entries(map).flatMap(([slug, target]) => (slug !== target ? [target] : [])));
+
+  for (const slug of Object.keys(map)) {
+    const isFragment = candidates[slug]?.raw === false;
+    const isUnreferencedCanonical = map[slug] === slug && !referencedTargets.has(slug);
+
+    if (isFragment && isUnreferencedCanonical) {
+      delete map[slug];
     }
   }
 

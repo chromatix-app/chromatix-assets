@@ -7,8 +7,9 @@
 // (config/delimiters.json, config/compound-tags.json). Fully regenerated on every run - same raw list
 // and config in, same file out.
 //
-// Output shape: { [slug]: { variants: string[], parts?: string[], primary?: string } }
+// Output shape: { [slug]: { variants: string[], raw: boolean, parts?: string[], primary?: string } }
 // - variants: every raw string (or split part) that slugifies to this slug
+// - raw: true if at least one raw tag string (not just a split part) slugifies directly to this slug
 // - parts/primary: only when the slug is itself a compound (see lib/selectPrimaryTag.ts for primary)
 //
 // A tag/part is dropped if it fails isValidTag or slugifies to a config/blocklist.json entry.
@@ -41,7 +42,7 @@ const CONFIG = {
 // TYPES
 // ======================================================================
 
-type CandidateEntry = { variants: string[]; parts?: string[]; primary?: string };
+type CandidateEntry = { variants: string[]; raw: boolean; parts?: string[]; primary?: string };
 
 // ======================================================================
 // MAIN
@@ -61,21 +62,24 @@ function main(): void {
     separators: config.delimiters.separators,
     connectors: config.delimiters.connectors,
     protectedTags: config.compoundTags,
+    distributiveHeads: config.delimiters.distributiveHeads,
   };
 
   const candidates: Record<string, CandidateEntry> = {};
-  const addVariant = (tag: string) => {
+  const addVariant = (tag: string, isRaw: boolean) => {
     const slug = slugifyTagName(tag);
 
     if (!slug) {
       return;
     }
 
-    const entry = (candidates[slug] ??= { variants: [] });
+    const entry = (candidates[slug] ??= { variants: [], raw: false });
 
     if (!entry.variants.includes(tag)) {
       entry.variants.push(tag);
     }
+
+    entry.raw ||= isRaw;
   };
 
   let rejected = 0;
@@ -87,7 +91,7 @@ function main(): void {
       continue;
     }
 
-    addVariant(tag);
+    addVariant(tag, true);
 
     const parts = splitMultiTag(tag, splitOptions).filter(isKeepable);
 
@@ -99,7 +103,7 @@ function main(): void {
       entry.parts ??= parts.map((part) => slugifyTagName(part));
       entry.primary ??= slugifyTagName(selectPrimaryTag(parts, config.modifiers.prefix));
 
-      parts.forEach(addVariant);
+      parts.forEach((part) => addVariant(part, false));
     }
   }
 

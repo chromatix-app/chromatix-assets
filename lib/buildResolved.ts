@@ -77,11 +77,12 @@ function main(): void {
 
   const canonical = Object.keys(resolved).filter((slug) => resolved[slug] === slug);
   const nonCanonical = Object.keys(resolved).filter((slug) => resolved[slug] !== slug);
-  const junkCount = Object.keys(candidates).length - Object.keys(resolved).length;
+  const junkCount = Object.keys(candidates).filter((slug) => resolver.resolve(slug).kind === 'junk').length;
+  const excludedFragmentCount = Object.keys(candidates).length - junkCount - Object.keys(resolved).length;
 
   console.log(
     chalk.green(
-      `✓ ${CONFIG.outputFile}: ${canonical.length} canonical, ${nonCanonical.length} sharing an image, ${junkCount} junk`
+      `✓ ${CONFIG.outputFile}: ${canonical.length} canonical, ${nonCanonical.length} sharing an image, ${junkCount} junk, ${excludedFragmentCount} unreferenced fragment(s) excluded`
     )
   );
 

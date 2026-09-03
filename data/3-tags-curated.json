@@ -70,7 +70,7 @@
       "related": []
     },
     "black-metal": {
-      "aliases": ["black", "black-and-thrash-metal"],
+      "aliases": ["black-and-thrash-metal"],
       "related": []
     },
     "boogie": {
@@ -437,7 +437,7 @@
       "related": []
     },
     "speed-metal": {
-      "aliases": ["speed", "speed-and-thrash-and-black-metal"],
+      "aliases": ["speed-and-thrash-and-black-metal"],
       "related": [],
       "name": "Speed Metal"
     },
