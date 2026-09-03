@@ -2,9 +2,12 @@
 // TAG IMAGE GENERATOR
 // ======================================================================
 //
-// Generates a thumbnail image for every tag in CONFIG.tagsFile that doesn't already have one, using
-// the Gemini API conditioned on a set of reference images. Already-generated tags are always skipped,
-// so this script can simply be re-run to pick up anything missing from a previous run.
+// Generates a thumbnail image for every canonical tag in data/3-tags-curated.json that doesn't already
+// have one, using the Gemini API conditioned on a set of reference images. Already-generated tags are
+// always skipped, so this script can simply be re-run to pick up anything missing from a previous run.
+//
+// Only canonical slugs are generated - never aliases/related slugs, which instead get their image via a
+// file copy from their canonical tag (see lib/buildResolved.ts / npm run tags:build).
 //
 // Usage: npm run tags:generate
 
@@ -15,7 +18,7 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 
-import { slugifyTagName } from './slugifyTagName.ts';
+import { loadCurated } from './curatedTags.ts';
 
 dotenv.config({ path: '.env' });
 dotenv.config({ path: '.env.local', override: true });
@@ -35,8 +38,9 @@ const CONFIG = {
   width: 500,
   height: 300,
 
-  // Input tags list, and where generated images are written to (as <slug>.jpg)
-  tagsFile: './data/tags.json',
+  // Curated tags (canonical slug list, and slug -> display name), and where generated images are written
+  // to (as <slug>.jpg)
+  curatedFile: './data/3-tags-curated.json',
   outputDir: './assets/tags/community',
 
   // Reference folders, tried in order for each tag - most references first. A request that fails with
@@ -196,22 +200,23 @@ async function generateThumbnailWithRetries(
 // MAIN
 // ======================================================================
 
-// Applies CONFIG.startTag, returning the tag list to actually process (and logs what was skipped)
-function getTagsToProcess(allTags: string[]): string[] {
+// Applies CONFIG.startTag (matched by canonical slug), returning the slug list to actually process (and
+// logs what was skipped)
+function getSlugsToProcess(allSlugs: string[]): string[] {
   if (!CONFIG.startTag) {
-    return allTags;
+    return allSlugs;
   }
 
-  const startIndex = allTags.findIndex((tag) => tag.toLowerCase() === CONFIG.startTag.toLowerCase());
+  const startIndex = allSlugs.findIndex((slug) => slug === CONFIG.startTag.toLowerCase());
 
   if (startIndex === -1) {
-    console.error(chalk.red(`✗ startTag "${CONFIG.startTag}" was not found in ${CONFIG.tagsFile}`));
+    console.error(chalk.red(`✗ startTag "${CONFIG.startTag}" was not found in ${CONFIG.curatedFile}`));
     process.exit(1);
   }
 
-  console.log(chalk.cyan(`▶ Starting from "${allTags[startIndex]}" (skipping ${startIndex} earlier tag(s))`));
+  console.log(chalk.cyan(`▶ Starting from "${allSlugs[startIndex]}" (skipping ${startIndex} earlier tag(s))`));
 
-  return allTags.slice(startIndex);
+  return allSlugs.slice(startIndex);
 }
 
 async function processTags(): Promise<void> {
@@ -222,8 +227,8 @@ async function processTags(): Promise<void> {
     process.exit(1);
   }
 
-  const allTags: string[] = JSON.parse(fs.readFileSync(CONFIG.tagsFile, 'utf-8'));
-  const tags = getTagsToProcess(allTags);
+  const curated = loadCurated(CONFIG.curatedFile);
+  const slugs = getSlugsToProcess(Object.keys(curated.canonical));
   const referenceTiers = loadReferenceTiers();
 
   if (!fs.existsSync(CONFIG.outputDir)) {
@@ -234,47 +239,38 @@ async function processTags(): Promise<void> {
   let skipped = 0;
   let failed = 0;
 
-  for (const tag of tags) {
+  for (const slug of slugs) {
     if (generated >= CONFIG.maxGenerationsPerRun) {
       console.log(chalk.cyan(`! Reached max of ${CONFIG.maxGenerationsPerRun} generations for this run, stopping`));
       break;
-    }
-
-    const slug = slugifyTagName(tag);
-
-    // Tags with no Latin/ASCII-alphanumeric characters (e.g. Cyrillic, CJK) slugify to an empty
-    // string, which would collide with every other such tag on the same output filename ("<empty>.jpg")
-    if (!slug) {
-      console.log(chalk.yellow(`- ${tag} (slugifies to an empty string, skipping)`));
-      skipped += 1;
-      continue;
     }
 
     const outputPath = path.join(CONFIG.outputDir, `${slug}.jpg`);
 
     // Never regenerate a tag that already has an output file
     if (fs.existsSync(outputPath)) {
-      console.log(chalk.dim(`- ${tag} (already exists, skipping)`));
+      console.log(chalk.dim(`- ${slug} (already exists, skipping)`));
       skipped += 1;
       continue;
     }
 
-    const { succeeded, lastError } = await generateThumbnailWithRetries(tag, outputPath, referenceTiers);
+    const name = curated.canonical[slug]?.name ?? slug;
+    const { succeeded, lastError } = await generateThumbnailWithRetries(name, outputPath, referenceTiers);
 
     if (succeeded) {
       generated += 1;
-      console.log(chalk.green(`✓ ${tag}`));
+      console.log(chalk.green(`✓ ${name}`));
     } else {
       failed += 1;
-      console.error(chalk.red(`✗ ${tag}: ${lastError?.message}`));
+      console.error(chalk.red(`✗ ${name}: ${lastError?.message}`));
     }
 
     await sleep(CONFIG.requestDelayMs);
   }
 
-  console.log(chalk.bgCyan(`✓ Generated ${generated}, skipped ${skipped}, failed ${failed} (of ${tags.length} tags)`));
+  console.log(chalk.bgCyan(`✓ Generated ${generated}, skipped ${skipped}, failed ${failed} (of ${slugs.length} tags)`));
 
-  const remaining = tags.length - skipped - generated;
+  const remaining = slugs.length - skipped - generated;
 
   if (remaining > 0) {
     console.log(chalk.cyan(`! ${remaining} tag(s) remaining - run again to continue`));

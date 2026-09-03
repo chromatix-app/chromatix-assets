@@ -27,7 +27,7 @@ This repo does not contain source code for the Chromatix web app itself - that i
 
 When browsing your music library in Chromatix, you can browse by tags such as genres, moods, and styles. This repo contains the thumbnail images for those tags, which are stored in `assets/tags/community/` and served from [https://assets.chromatix.app/](https://assets.chromatix.app/).
 
-Tags are essentially unlimited as people can tag items however they want, but anonymised usage data has allowed many tags in use to be collated here in `data/tags.json`. Some tags are already very niche, bizarre, or badly formatted, but they're taken from legitimate usage of the app.
+Tags are essentially unlimited as people can tag items however they want, but anonymised usage data has allowed many tags in use to be collated here. The full list of curated, canonical tags (each with its own image) is in `data/3-tags-curated.json`, along with any known spelling/naming variants that resolve to the same image. Some tags are already very niche, bizarre, or badly formatted, but they're taken from legitimate usage of the app.
 
 The sheer number of tags made manual curation unfeasible, but batch-generated AI images are a practical alternative. That does mean many of the images are poor quality, but the goal is to have something for every tag.
 
@@ -41,12 +41,12 @@ Example of some of the images in use in the app:
 
 # 2. Contributing images
 
-Image contributions are welcome! For now, contributions are limited to replacing or adding images in `assets/tags/community/` — please don't submit changes to `data/tags.json` or any code, those aren't open for contribution at this time.
+Image contributions are welcome! For now, contributions are limited to replacing or adding images in `assets/tags/community/` — please don't submit changes to `data/3-tags-curated.json` or any code, those aren't open for contribution at this time.
 
 To contribute:
 
 1. Fork this repo.
-2. Add or replace one or more images in `assets/tags/community/`. The filename must match the existing slug for that tag (see `data/tags.json` for the list of tag names, and `lib/slugifyTagName.ts` for how a tag name maps to its filename).
+2. Add or replace one or more images in `assets/tags/community/`. The filename must match the existing slug for that tag (see `data/3-tags-curated.json` for the canonical tag list, and `lib/slugifyTagName.ts` for how a tag name maps to its filename).
 3. Make sure each image meets the project spec:
    - **500x300px**, exactly.
    - **`.jpg` format**.
@@ -91,7 +91,8 @@ Get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
 npm run tags:generate
 ```
 
-Reads tag names from `data/tags.json` and generates a thumbnail for any tag that doesn't already have one in
+Reads canonical tag names from `data/4-tags-resolved.json` (built from `data/3-tags-curated.json` via
+`npm run tags:build`) and generates a thumbnail for any tag that doesn't already have one in
 `assets/tags/community/`. Already-generated tags are always skipped, so it's safe to re-run at any time to pick up
 anything missing from a previous run (e.g. after adding new tags, or if a request failed).
 
@@ -101,11 +102,11 @@ All generator config — the AI prompt, output dimensions, reference image folde
 # 5. Deploying
 
 This repo deploys to Vercel as a static site (no build step). `vercel.json` and `.vercelignore` scope the deploy to
-just `assets/` and `data/tags.json`, so once deployed, assets and the tags list are reachable at:
+just `assets/` and `data/4-tags-resolved.json`, so once deployed, assets and the resolved tag list are reachable at:
 
 ```
 https://assets.chromatix.app/assets/tags/community/<slug>.jpg
-https://assets.chromatix.app/data/tags.json
+https://assets.chromatix.app/data/4-tags-resolved.json
 ```
 
 # 6. Other scripts

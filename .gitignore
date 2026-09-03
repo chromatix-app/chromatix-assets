@@ -6,3 +6,7 @@
 *.env
 *.log
 node_modules/
+
+# Transient tags:triage output - regenerate with `npm run tags:triage -- --json` / `-- --prompt`
+data/tags-triage.json
+data/curation-prompt.md
