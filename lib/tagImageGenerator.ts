@@ -2,12 +2,14 @@
 // TAG IMAGE GENERATOR
 // ======================================================================
 //
-// Generates a thumbnail image for every canonical tag in data/3-tags-curated.json that doesn't already
-// have one, using the Gemini API conditioned on a set of reference images. Already-generated tags are
-// always skipped, so this script can simply be re-run to pick up anything missing from a previous run.
+// Generates a thumbnail image for every canonical tag in data/4-tags-resolved.json (a slug that maps to
+// itself) that doesn't already have one, using the Gemini API conditioned on a set of reference images.
+// Already-generated tags are always skipped, so this script can simply be re-run to pick up anything
+// missing from a previous run. Run `npm run tags:build` first so the resolved map is current.
 //
-// Only canonical slugs are generated - never aliases/related slugs, which instead get their image via a
-// file copy from their canonical tag (see lib/buildResolved.ts / npm run tags:build).
+// Only canonical slugs are generated - a slug that shares another tag's image gets a file copy from
+// lib/buildResolved.ts instead. The prompt uses the tag's display name (lib/resolveTag.ts displayName),
+// not the slug.
 //
 // Usage: npm run tags:generate
 
@@ -18,7 +20,9 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 
+import { loadConfig } from './config.ts';
 import { loadCurated } from './curatedTags.ts';
+import { type Candidates, createResolver } from './resolveTag.ts';
 
 dotenv.config({ path: '.env' });
 dotenv.config({ path: '.env.local', override: true });
@@ -38,8 +42,10 @@ const CONFIG = {
   width: 500,
   height: 300,
 
-  // Curated tags (canonical slug list, and slug -> display name), and where generated images are written
-  // to (as <slug>.jpg)
+  // Resolved map (which slugs are canonical), candidates + curated (for display names), and where
+  // generated images are written to (as <slug>.jpg)
+  resolvedFile: './data/4-tags-resolved.json',
+  candidatesFile: './data/2-candidates.json',
   curatedFile: './data/3-tags-curated.json',
   outputDir: './assets/tags/community',
 
@@ -68,8 +74,7 @@ const CONFIG = {
   // time. Useful for staying under a rate/quota limit, or for testing on a small batch.
   maxGenerationsPerRun: 999,
 
-  // Tag name to start from in the tags list (case-insensitive) - everything before it is skipped.
-  // Set to an empty string to start from the beginning of the list as normal.
+  // Canonical slug to start from - everything before it is skipped. Empty string starts from the beginning.
   startTag: '',
 };
 
@@ -200,8 +205,7 @@ async function generateThumbnailWithRetries(
 // MAIN
 // ======================================================================
 
-// Applies CONFIG.startTag (matched by canonical slug), returning the slug list to actually process (and
-// logs what was skipped)
+// Applies CONFIG.startTag, returning the slug list to actually process (and logs what was skipped)
 function getSlugsToProcess(allSlugs: string[]): string[] {
   if (!CONFIG.startTag) {
     return allSlugs;
@@ -210,7 +214,7 @@ function getSlugsToProcess(allSlugs: string[]): string[] {
   const startIndex = allSlugs.findIndex((slug) => slug === CONFIG.startTag.toLowerCase());
 
   if (startIndex === -1) {
-    console.error(chalk.red(`✗ startTag "${CONFIG.startTag}" was not found in ${CONFIG.curatedFile}`));
+    console.error(chalk.red(`✗ startTag "${CONFIG.startTag}" is not a canonical slug in ${CONFIG.resolvedFile}`));
     process.exit(1);
   }
 
@@ -227,8 +231,12 @@ async function processTags(): Promise<void> {
     process.exit(1);
   }
 
-  const curated = loadCurated(CONFIG.curatedFile);
-  const slugs = getSlugsToProcess(Object.keys(curated.canonical));
+  const resolved: Record<string, string> = JSON.parse(fs.readFileSync(CONFIG.resolvedFile, 'utf-8'));
+  const candidates: Candidates = JSON.parse(fs.readFileSync(CONFIG.candidatesFile, 'utf-8'));
+  const resolver = createResolver(candidates, loadCurated(CONFIG.curatedFile), loadConfig());
+
+  const canonicalSlugs = Object.keys(resolved).filter((slug) => resolved[slug] === slug);
+  const slugs = getSlugsToProcess(canonicalSlugs);
   const referenceTiers = loadReferenceTiers();
 
   if (!fs.existsSync(CONFIG.outputDir)) {
@@ -254,7 +262,7 @@ async function processTags(): Promise<void> {
       continue;
     }
 
-    const name = curated.canonical[slug]?.name ?? slug;
+    const name = resolver.displayName(slug);
     const { succeeded, lastError } = await generateThumbnailWithRetries(name, outputPath, referenceTiers);
 
     if (succeeded) {

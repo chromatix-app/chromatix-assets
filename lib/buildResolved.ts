@@ -2,27 +2,27 @@
 // BUILD RESOLVED
 // ======================================================================
 //
-// Stateless. Reads data/3-tags-curated.json (see lib/curatedTags.ts) and writes CONFIG.outputFile
-// (data/4-tags-resolved.json) - the flat, deployed lookup the app uses at runtime (see spec.md §3.1):
+// Stateless. Resolves every candidate slug (lib/resolveTag.ts) using data/2-candidates.json, the
+// exceptions in data/3-tags-curated.json and the lists in config/, and writes CONFIG.outputFile
+// (data/4-tags-resolved.json) - the flat, deployed lookup the app uses at runtime:
 //   { [slug]: canonicalSlug }
-// A single flat map from every known slug (canonical, alias, or related) to its canonical slug - a
-// canonical slug maps to itself. Resolving a tag is one lookup: `resolved[slugifyTagName(tag)] ?? FALLBACK`.
-// This deliberately does NOT distinguish canonical/alias/related at runtime (the app never needs to know
-// which one a slug was, only what image to show) - that distinction only matters for editing, and lives in
-// 3-tags-curated.json's structure instead (see spec.md §3.2). "aliases" here covers both an entry's
-// `aliases` and `related` slugs - both resolve identically at runtime.
+// Every non-junk slug maps to the canonical slug whose image it shows; canonical slugs map to themselves.
+// Resolving a tag in the app is one lookup: `resolved[slugifyTagName(tag)] ?? FALLBACK`.
 //
-// Until the app is updated to read 4-tags-resolved.json, this also COPIES each canonical tag's image to
-// every one of its alias/related slugs (e.g. rock.jpg -> rok.jpg), so aliases resolve correctly under the
-// app's current slugifyTagName-only lookup. Existing identical copies are left alone; a copy is only
-// (re)written if missing or different from the canonical image.
+// Image files are never an INPUT to resolution - the map is a pure function of data + config, so it's
+// consistent over time. Images are only a downstream concern, reported here:
+//   - canonical slugs with no image yet (tags:generate's queue)
+//   - images whose slug is not canonical (junk/alias/related, or no longer a tag at all) - orphans that
+//     can be deleted in a reviewed commit; never deleted automatically
+//   - curated exceptions that point at unknown slugs
 //
-// Also prints three reports, informational only - nothing here is ever auto-deleted:
-//   - canonical slugs with no image yet (this is tagImageGenerator.ts's input)
-//   - images whose slug is junk, or an alias/related slug (the canonical image is the "real" one; these
-//     are candidates for deletion once the app no longer needs the copies, but that's a manual decision)
-//   - curated slugs (canonical/alias/related/junk) that no longer appear in data/2-candidates.json (the API
-//     may have stopped returning that raw tag - informational only, curated entries are never auto-pruned)
+// Until the app reads 4-tags-resolved.json directly, this also COPIES each canonical image to its
+// alias/related slugs (rock.jpg -> rok.jpg) so those tags work under the app's current
+// slugifyTagName-only lookup. Identical existing copies are left alone.
+//
+// Finally, the map is diffed against the last COMMITTED map (lib/resolvedBaseline.ts) and a verdict is
+// printed: either nothing new needs a decision, or the exact next command to review new canonical tags
+// before they get images.
 //
 // Usage: npm run tags:build
 
@@ -30,56 +30,82 @@ import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
 
-import { type CanonicalEntry, loadCurated } from './curatedTags.ts';
+import { loadConfig } from './config.ts';
+import { loadCurated } from './curatedTags.ts';
+import { type Candidates, buildResolvedMap, createResolver } from './resolveTag.ts';
+import { diffResolved, loadBaseline } from './resolvedBaseline.ts';
 
 // ======================================================================
 // CONFIG
 // ======================================================================
 
 const CONFIG = {
-  curatedFile: './data/3-tags-curated.json',
   candidatesFile: './data/2-candidates.json',
+  curatedFile: './data/3-tags-curated.json',
   outputFile: './data/4-tags-resolved.json',
   imageDir: './assets/tags/community',
+
+  // How many slugs to list per report before truncating with a count
+  reportLimit: 40,
 };
 
 // ======================================================================
 // MAIN
 // ======================================================================
 
+function listReport(title: string, slugs: string[], colour: (s: string) => string = chalk.cyan): void {
+  console.log(colour(`\n! ${slugs.length} ${title}`));
+  slugs.slice(0, CONFIG.reportLimit).forEach((slug) => console.log(chalk.dim(`  ${slug}`)));
+
+  if (slugs.length > CONFIG.reportLimit) {
+    console.log(chalk.dim(`  … and ${slugs.length - CONFIG.reportLimit} more`));
+  }
+}
+
 function main(): void {
   console.log(chalk.bgCyan('# Building resolved tags'));
 
+  const config = loadConfig();
   const curated = loadCurated(CONFIG.curatedFile);
-  const candidates: Record<string, unknown> = JSON.parse(fs.readFileSync(CONFIG.candidatesFile, 'utf-8'));
+  const candidates: Candidates = JSON.parse(fs.readFileSync(CONFIG.candidatesFile, 'utf-8'));
+  const resolver = createResolver(candidates, curated, config);
 
-  const canonical = Object.keys(curated.canonical);
-  const aliases: Record<string, string> = {};
+  const baseline = loadBaseline(CONFIG.outputFile);
+  const resolved = buildResolvedMap(candidates, resolver);
 
-  for (const [canonicalSlug, entry] of Object.entries(curated.canonical) as [string, CanonicalEntry][]) {
-    for (const alias of [...entry.aliases, ...entry.related]) {
-      aliases[alias] = canonicalSlug;
+  fs.writeFileSync(CONFIG.outputFile, `${JSON.stringify(resolved, null, 2)}\n`);
+
+  const canonical = Object.keys(resolved).filter((slug) => resolved[slug] === slug);
+  const nonCanonical = Object.keys(resolved).filter((slug) => resolved[slug] !== slug);
+  const junkCount = Object.keys(candidates).length - Object.keys(resolved).length;
+
+  console.log(
+    chalk.green(
+      `✓ ${CONFIG.outputFile}: ${canonical.length} canonical, ${nonCanonical.length} sharing an image, ${junkCount} junk`
+    )
+  );
+
+  // ----------------------------------------------------------------------
+  // Exceptions sanity: targets that resolve nowhere
+  // ----------------------------------------------------------------------
+
+  const unknownTargets: string[] = [];
+
+  for (const [slug, entry] of Object.entries(curated.canonical)) {
+    for (const mapped of [...entry.aliases, ...entry.related]) {
+      if (!(mapped in candidates)) {
+        unknownTargets.push(`${mapped} (alias/related of ${slug}, not in candidates)`);
+      }
+    }
+
+    if (!(slug in candidates)) {
+      unknownTargets.push(`${slug} (canonical, not in candidates)`);
     }
   }
 
-  const resolved: Record<string, string> = {};
-
-  for (const slug of canonical) {
-    resolved[slug] = slug;
+  if (unknownTargets.length > 0) {
+    listReport('curated slug(s) not present in 2-candidates.json (stale exceptions?):', unknownTargets, chalk.yellow);
   }
-
-  for (const [aliasSlug, canonicalSlug] of Object.entries(aliases)) {
-    resolved[aliasSlug] = canonicalSlug;
-  }
-
-  const sortedResolved = Object.fromEntries(
-    Object.entries(resolved).sort(([a], [b]) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
-  );
-
-  fs.writeFileSync(CONFIG.outputFile, `${JSON.stringify(sortedResolved, null, 2)}\n`);
-  console.log(
-    chalk.green(`✓ ${CONFIG.outputFile}: ${canonical.length} canonical, ${Object.keys(aliases).length} alias(es)`)
-  );
 
   // ----------------------------------------------------------------------
   // Copy canonical images to alias/related slugs
@@ -88,16 +114,16 @@ function main(): void {
   let copied = 0;
   let missingSource = 0;
 
-  for (const [aliasSlug, canonicalSlug] of Object.entries(aliases)) {
-    const sourcePath = path.join(CONFIG.imageDir, `${canonicalSlug}.jpg`);
-    const targetPath = path.join(CONFIG.imageDir, `${aliasSlug}.jpg`);
+  for (const slug of nonCanonical) {
+    const sourcePath = path.join(CONFIG.imageDir, `${resolved[slug]}.jpg`);
+    const targetPath = path.join(CONFIG.imageDir, `${slug}.jpg`);
 
     if (!fs.existsSync(sourcePath)) {
       missingSource += 1;
       continue;
     }
 
-    if (fs.existsSync(targetPath) && filesAreIdentical(sourcePath, targetPath)) {
+    if (fs.existsSync(targetPath) && fs.readFileSync(sourcePath).equals(fs.readFileSync(targetPath))) {
       continue;
     }
 
@@ -107,12 +133,12 @@ function main(): void {
 
   console.log(
     chalk.green(
-      `✓ Copied ${copied} alias image(s)${missingSource > 0 ? ` (${missingSource} canonical image(s) missing, skipped)` : ''}`
+      `✓ Copied ${copied} shared image(s)${missingSource > 0 ? ` (${missingSource} skipped - canonical image missing)` : ''}`
     )
   );
 
   // ----------------------------------------------------------------------
-  // Reports
+  // Image reports (informational - nothing is deleted)
   // ----------------------------------------------------------------------
 
   const existingImages = new Set(
@@ -121,25 +147,54 @@ function main(): void {
       .filter((file) => file.endsWith('.jpg'))
       .map((file) => file.slice(0, -'.jpg'.length))
   );
+  const canonicalSet = new Set(canonical);
+  const nonCanonicalSet = new Set(nonCanonical);
 
-  const missingImages = canonical.filter((slug) => !existingImages.has(slug));
-  console.log(chalk.cyan(`\n! ${missingImages.length} canonical slug(s) have no image (tags:generate input):`));
-  missingImages.forEach((slug) => console.log(chalk.dim(`  ${slug}`)));
-
-  const deletionCandidates = [...existingImages].filter((slug) => curated.junk.includes(slug) || slug in aliases);
-  console.log(chalk.cyan(`\n! ${deletionCandidates.length} image(s) are junk/alias/related (never auto-deleted):`));
-  deletionCandidates.forEach((slug) => console.log(chalk.dim(`  ${slug}`)));
-
-  const allCuratedSlugs = [...canonical, ...Object.keys(aliases), ...curated.junk];
-  const staleSlugs = allCuratedSlugs.filter((slug) => !(slug in candidates));
-  console.log(
-    chalk.cyan(`\n! ${staleSlugs.length} curated slug(s) no longer appear in 2-candidates.json (informational):`)
+  listReport(
+    'canonical slug(s) have no image yet (tags:generate queue)',
+    canonical.filter((slug) => !existingImages.has(slug))
   );
-  staleSlugs.forEach((slug) => console.log(chalk.dim(`  ${slug}`)));
-}
+  listReport(
+    'image(s) are not for a canonical slug - shared copies, junk, or no longer a tag (delete in a reviewed commit if wanted)',
+    [...existingImages].filter((slug) => !canonicalSet.has(slug) && !nonCanonicalSet.has(slug)).sort()
+  );
 
-function filesAreIdentical(a: string, b: string): boolean {
-  return fs.readFileSync(a).equals(fs.readFileSync(b));
+  // ----------------------------------------------------------------------
+  // Verdict: what changed since the last committed map, and what to do next
+  // ----------------------------------------------------------------------
+
+  const diff = diffResolved(baseline, resolved);
+
+  console.log(chalk.bgCyan('\n# Since last commit'));
+  console.log(
+    chalk.dim(
+      `  ${diff.added.length} new slug(s), ${diff.retargeted.length} re-resolved, ${diff.removed.length} removed`
+    )
+  );
+
+  if (diff.retargeted.length > 0) {
+    listReport(
+      'slug(s) now point at a different image (config/exception change):',
+      diff.retargeted.map((r) => `${r.slug}: ${r.from} -> ${r.to}`)
+    );
+  }
+
+  if (diff.addedCanonical.length === 0) {
+    console.log(chalk.bgGreen('\n✓ No new canonical tags - nothing to review'));
+    return;
+  }
+
+  listReport(
+    'new canonical tag(s) will get their own image - review before running tags:generate:',
+    diff.addedCanonical,
+    chalk.yellow
+  );
+  console.log(chalk.bgYellow('\n→ Next step: review these with AI'));
+  console.log('  1. npm run tags:triage -- --prompt');
+  console.log(
+    '  2. Paste the contents of data/curation-prompt.md into a Claude chat and let it edit data/3-tags-curated.json'
+  );
+  console.log('  3. npm run tags:build   (then commit - committing is what marks them reviewed)');
 }
 
 main();

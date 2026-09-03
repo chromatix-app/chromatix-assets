@@ -1,0 +1,24 @@
+{
+  "description": "Tag names that legitimately contain a connector word as part of the name itself, so the splitter must not break them apart - even when they appear inside a longer list ('Drum & Bass & UK Garage' -> ['Drum & Bass', 'UK Garage']). Matched case-insensitively, with any amount of whitespace around the connector. Add an entry whenever a real 'X & Y' genre or category name turns up in the data.",
+  "tags": [
+    "drum & bass",
+    "drum and bass",
+    "drill & bass",
+    "drill and bass",
+    "rhythm & blues",
+    "rhythm and blues",
+    "rock & roll",
+    "rock and roll",
+    "town & country",
+    "stage & screen",
+    "books & spoken",
+    "comedy & spoken",
+    "spoken & audio",
+    "praise & worship",
+    "meditation & relaxation",
+    "singer & songwriter",
+    "country & irish",
+    "big band & swing",
+    "films & games"
+  ]
+}

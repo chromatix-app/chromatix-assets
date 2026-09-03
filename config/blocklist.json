@@ -1,0 +1,16 @@
+{
+  "description": "Raw tag strings dropped before anything else happens - applied to every raw tag and to every part of a split tag, compared by slug (so casing/punctuation variants match). Use this for strings that are structurally valid but never a genre/mood/style (placeholders, 'misc', 'test'). Junk that is only recognisable as junk once you know what other tags exist (an artist name, a record label) belongs in data/3-tags-curated.json's 'junk' list instead.",
+  "tags": [
+    "Misc",
+    "Miscellaneous",
+    "Mix",
+    "Mixed",
+    "Data & Other",
+    "Other",
+    "Unknown",
+    "Untitled",
+    "Test",
+    "N/A",
+    "None"
+  ]
+}

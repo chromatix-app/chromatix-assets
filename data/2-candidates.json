@@ -263,22 +263,34 @@
   "alternate-rock": {
     "variants": ["Alternate Rock"]
   },
+  "alternatif": {
+    "variants": ["Alternatif"]
+  },
   "alternatif-et-inde": {
-    "variants": ["Alternatif et Indé"]
+    "variants": ["Alternatif et Indé"],
+    "parts": ["alternatif", "inde"],
+    "primary": "alternatif"
   },
   "alternatif-et-inde-rock-pop": {
     "variants": ["Alternatif et Indé, Rock, Pop"],
-    "parts": ["alternatif-et-inde", "rock", "pop"],
-    "primary": "alternatif-et-inde"
+    "parts": ["alternatif", "inde", "rock", "pop"],
+    "primary": "alternatif"
+  },
+  "alternativ": {
+    "variants": ["Alternativ"]
   },
   "alternativ-und-indie": {
-    "variants": ["Alternativ und Indie"]
+    "variants": ["Alternativ und Indie"],
+    "parts": ["alternativ", "indie"],
+    "primary": "alternativ"
   },
   "alternativa": {
     "variants": ["Alternativa"]
   },
   "alternativa-y-rock-en-espanol": {
-    "variants": ["Alternativa y rock en español"]
+    "variants": ["Alternativa y rock en español"],
+    "parts": ["alternativa", "rock-en-espanol"],
+    "primary": "alternativa"
   },
   "alternative": {
     "variants": ["[Alternative]", "Alternative"]
@@ -419,13 +431,11 @@
     "parts": ["alternative-rock", "pop"],
     "primary": "alternative-rock"
   },
-  "alternative-singer": {
-    "variants": ["Alternative Singer"]
-  },
   "alternative-singer-and-songwriter": {
-    "variants": ["Alternative Singer & Songwriter"],
-    "parts": ["alternative-singer", "songwriter"],
-    "primary": "alternative-singer"
+    "variants": ["Alternative Singer & Songwriter"]
+  },
+  "alternativo": {
+    "variants": ["Alternativo"]
   },
   "alternrock": {
     "variants": ["AlternRock"]
@@ -710,9 +720,6 @@
   "atmospheric-sludge-metal": {
     "variants": ["Atmospheric Sludge Metal"]
   },
-  "audio": {
-    "variants": ["Audio"]
-  },
   "audio-book": {
     "variants": ["Audio Book"]
   },
@@ -764,7 +771,9 @@
     "variants": ["Avant-Garde Metal"]
   },
   "avant-garde-metal-progressive-rock": {
-    "variants": ["Avant-Garde Metal | Progressive Rock"]
+    "variants": ["Avant-Garde Metal | Progressive Rock"],
+    "parts": ["avant-garde-metal", "progressive-rock"],
+    "primary": "avant-garde-metal"
   },
   "avant-garde-music": {
     "variants": ["Avant-Garde Music"]
@@ -829,10 +838,14 @@
     "variants": ["Ballad"]
   },
   "ballad-pop-rnb-swing": {
-    "variants": ["Ballad_Pop_Rnb Swing"]
+    "variants": ["Ballad_Pop_Rnb Swing"],
+    "parts": ["ballad", "pop", "rnb-swing"],
+    "primary": "ballad"
   },
   "ballad-rnb-swing-pop": {
-    "variants": ["Ballad_Rnb Swing_Pop"]
+    "variants": ["Ballad_Rnb Swing_Pop"],
+    "parts": ["ballad", "rnb-swing", "pop"],
+    "primary": "ballad"
   },
   "ballet": {
     "variants": ["Ballet"]
@@ -871,7 +884,7 @@
     "variants": ["Barsuk"]
   },
   "bass": {
-    "variants": ["Bass", "bass", "bass)"]
+    "variants": ["Bass"]
   },
   "bass-and-breaks": {
     "variants": ["Bass  &  Breaks"],
@@ -915,6 +928,9 @@
   "beatdown-hardcore": {
     "variants": ["Beatdown Hardcore"]
   },
+  "beatlesque": {
+    "variants": ["Beatlesque"]
+  },
   "beats": {
     "variants": ["Beats", "BEATS"]
   },
@@ -951,9 +967,7 @@
     "variants": ["Big Band"]
   },
   "big-band-and-swing": {
-    "variants": ["Big Band & Swing"],
-    "parts": ["big-band", "swing"],
-    "primary": "big-band"
+    "variants": ["Big Band & Swing"]
   },
   "big-beat": {
     "variants": ["Big Beat"]
@@ -1085,13 +1099,8 @@
   "book-nonfiction": {
     "variants": ["Book-NonFiction"]
   },
-  "books": {
-    "variants": ["Books"]
-  },
   "books-and-spoken": {
-    "variants": ["Books & Spoken"],
-    "parts": ["books", "spoken"],
-    "primary": "books"
+    "variants": ["Books & Spoken"]
   },
   "boom-bap": {
     "variants": ["Boom Bap"]
@@ -1273,6 +1282,9 @@
   },
   "brown-eyed-soul": {
     "variants": ["Brown-Eyed Soul"]
+  },
+  "brutal-death-metal": {
+    "variants": ["Brutal Death Metal"]
   },
   "brutal-prog": {
     "variants": ["Brutal Prog"]
@@ -1529,7 +1541,9 @@
     "primary": "chillout"
   },
   "chillout-downtempo-lounge": {
-    "variants": ["Chillout | Downtempo | Lounge"]
+    "variants": ["Chillout | Downtempo | Lounge"],
+    "parts": ["chillout", "downtempo", "lounge"],
+    "primary": "chillout"
   },
   "chillwave": {
     "variants": ["Chillwave"]
@@ -1645,7 +1659,7 @@
   "classic-pop-and-rock": {
     "variants": ["Classic Pop And Rock"],
     "parts": ["classic-pop", "rock"],
-    "primary": "classic-pop"
+    "primary": "rock"
   },
   "classic-prog": {
     "variants": ["Classic Prog"]
@@ -1656,7 +1670,7 @@
   "classic-rock-pop-rock": {
     "variants": ["Classic Rock, Pop Rock"],
     "parts": ["classic-rock", "pop-rock"],
-    "primary": "classic-rock"
+    "primary": "pop-rock"
   },
   "classic-schlager": {
     "variants": ["Classic Schlager"]
@@ -1755,9 +1769,7 @@
     "variants": ["Comedy", "Comedy*"]
   },
   "comedy-and-spoken": {
-    "variants": ["Comedy & Spoken"],
-    "parts": ["comedy", "spoken"],
-    "primary": "comedy"
+    "variants": ["Comedy & Spoken"]
   },
   "comedy-rap": {
     "variants": ["Comedy Rap"]
@@ -1852,7 +1864,7 @@
   "contemporary-folk-and-folk-rock": {
     "variants": ["Contemporary Folk & Folk Rock"],
     "parts": ["contemporary-folk", "folk-rock"],
-    "primary": "contemporary-folk"
+    "primary": "folk-rock"
   },
   "contemporary-gospel": {
     "variants": ["Contemporary Gospel"]
@@ -1875,7 +1887,7 @@
   "contemporary-pop-and-rock": {
     "variants": ["Contemporary Pop & Rock"],
     "parts": ["contemporary-pop", "rock"],
-    "primary": "contemporary-pop"
+    "primary": "rock"
   },
   "contemporary-r-and-b": {
     "variants": ["Contemporary R&B"]
@@ -1886,13 +1898,8 @@
   "contemporary-reggae": {
     "variants": ["Contemporary Reggae"]
   },
-  "contemporary-singer": {
-    "variants": ["Contemporary Singer"]
-  },
   "contemporary-singer-and-songwriter": {
-    "variants": ["Contemporary Singer & Songwriter"],
-    "parts": ["contemporary-singer", "songwriter"],
-    "primary": "contemporary-singer"
+    "variants": ["Contemporary Singer & Songwriter"]
   },
   "continental-jazz": {
     "variants": ["Continental Jazz"]
@@ -1930,9 +1937,7 @@
     "primary": "country"
   },
   "country-and-irish": {
-    "variants": ["Country & Irish"],
-    "parts": ["country", "irish"],
-    "primary": "country"
+    "variants": ["Country & Irish"]
   },
   "country-and-neotraditional-country": {
     "variants": ["Country & Neotraditional Country"],
@@ -2215,7 +2220,7 @@
   },
   "death-and-thrash-metal-nu-metal-and-groove-and-thrash-metal": {
     "variants": ["Death  &  Thrash Metal | Nu-Metal  &  Groove  &  Thrash Metal"],
-    "parts": ["death", "thrash-metal-nu-metal", "groove", "thrash-metal"],
+    "parts": ["death", "thrash-metal", "nu-metal", "groove", "thrash-metal"],
     "primary": "death"
   },
   "death-doom-metal": {
@@ -2232,7 +2237,16 @@
   "death-metal-brutal-death-metal-technical-death-metal-progressive-death-metal-deathcore-old-school-death-metal": {
     "variants": [
       "Death Metal | Brutal Death Metal | Technical Death Metal | Progressive Death Metal | Deathcore | Old School Death Metal"
-    ]
+    ],
+    "parts": [
+      "death-metal",
+      "brutal-death-metal",
+      "technical-death-metal",
+      "progressive-death-metal",
+      "deathcore",
+      "old-school-death-metal"
+    ],
+    "primary": "death-metal"
   },
   "deathcore": {
     "variants": ["Deathcore"]
@@ -2500,12 +2514,10 @@
     "variants": ["Dreamy"]
   },
   "drill": {
-    "variants": ["Drill", "drill"]
+    "variants": ["Drill"]
   },
   "drill-and-bass": {
-    "variants": ["drill & bass"],
-    "parts": ["drill", "bass"],
-    "primary": "drill"
+    "variants": ["drill & bass"]
   },
   "drill-and-codeine-trap": {
     "variants": ["Drill & Codeine-Trap"],
@@ -2584,13 +2596,8 @@
   "drum-and-bass-breakcore": {
     "variants": ["drum & bass (breakcore)"]
   },
-  "drum-and-bass-drill": {
-    "variants": ["drum & bass (drill"]
-  },
   "drum-and-bass-drill-and-bass": {
-    "variants": ["drum & bass (drill & bass)"],
-    "parts": ["drum-and-bass-drill", "bass"],
-    "primary": "drum-and-bass-drill"
+    "variants": ["drum & bass (drill & bass)"]
   },
   "drum-n-bass": {
     "variants": ["Drum 'N Bass", "Drum 'n' Bass", "Drum n Bass"]
@@ -2650,7 +2657,7 @@
   "early-british-pop-and-rock": {
     "variants": ["Early British Pop & Rock"],
     "parts": ["early-british-pop", "rock"],
-    "primary": "early-british-pop"
+    "primary": "rock"
   },
   "early-jazz": {
     "variants": ["Early Jazz"]
@@ -2664,7 +2671,7 @@
   "early-pop-and-rock": {
     "variants": ["Early Pop & Rock"],
     "parts": ["early-pop", "rock"],
-    "primary": "early-pop"
+    "primary": "rock"
   },
   "early-r-and-b": {
     "variants": ["Early R&B"]
@@ -3238,15 +3245,16 @@
     "variants": ["Films"]
   },
   "films-and-games": {
-    "variants": ["Films & Games"],
-    "parts": ["films", "games"],
-    "primary": "films"
+    "variants": ["Films & Games"]
   },
   "finger-picked-guitar": {
     "variants": ["Finger-Picked Guitar"]
   },
   "finnish-folk": {
     "variants": ["Finnish Folk"]
+  },
+  "finnish-metal": {
+    "variants": ["Finnish Metal"]
   },
   "flamenco": {
     "variants": ["Flamenco"]
@@ -3617,7 +3625,7 @@
   "general-rap-and-hip-hop": {
     "variants": ["General Rap & Hip-Hop"],
     "parts": ["general-rap", "hip-hop"],
-    "primary": "general-rap"
+    "primary": "hip-hop"
   },
   "general-reggae": {
     "variants": ["General Reggae"]
@@ -3772,6 +3780,9 @@
   },
   "gothic-rock": {
     "variants": ["Gothic Rock"]
+  },
+  "gothnroll": {
+    "variants": ["Goth'n'Roll"]
   },
   "gqom": {
     "variants": ["Gqom"]
@@ -4028,7 +4039,9 @@
     "primary": "hip-hop"
   },
   "hip-hop-e-rap": {
-    "variants": ["Hip-hop e Rap"]
+    "variants": ["Hip-hop e Rap"],
+    "parts": ["hip-hop", "rap"],
+    "primary": "hip-hop"
   },
   "hip-hop-hip-hop-and-rap-rap-turntablism-chillout-cinematic-hip-hop-instrumentals-trip-hop-paris": {
     "variants": [
@@ -4244,6 +4257,9 @@
   "improvisatory": {
     "variants": ["Improvisatory"]
   },
+  "inde": {
+    "variants": ["Indé"]
+  },
   "indian": {
     "variants": ["Indian"]
   },
@@ -4296,7 +4312,7 @@
   },
   "indie-pop-singer-and-songwriter": {
     "variants": ["Indie Pop, Singer & Songwriter"],
-    "parts": ["indie-pop", "singer", "songwriter"],
+    "parts": ["indie-pop", "singer-and-songwriter"],
     "primary": "indie-pop"
   },
   "indie-punk": {
@@ -4473,9 +4489,6 @@
   },
   "iranian": {
     "variants": ["Iranian"]
-  },
-  "irish": {
-    "variants": ["Irish"]
   },
   "irish-folk": {
     "variants": ["Irish Folk"]
@@ -5176,13 +5189,8 @@
   "mechanical": {
     "variants": ["Mechanical"]
   },
-  "meditation": {
-    "variants": ["Meditation"]
-  },
   "meditation-and-relaxation": {
-    "variants": ["Meditation & Relaxation"],
-    "parts": ["meditation", "relaxation"],
-    "primary": "meditation"
+    "variants": ["Meditation & Relaxation"]
   },
   "meditative": {
     "variants": ["Meditative"]
@@ -5781,7 +5789,7 @@
     "primary": "nu-jazz"
   },
   "nu-metal": {
-    "variants": ["Nu Metal", "Nü Metal", "Nu-Metal"]
+    "variants": ["Nu Metal", "Nu-Metal", "Nü Metal"]
   },
   "nueva-cancion": {
     "variants": ["Nueva Cancion"]
@@ -5910,7 +5918,7 @@
   "original-soundtrack-vocal": {
     "variants": ["Original Soundtrack, Vocal"],
     "parts": ["original-soundtrack", "vocal"],
-    "primary": "original-soundtrack"
+    "primary": "vocal"
   },
   "ornate": {
     "variants": ["Ornate"]
@@ -6224,7 +6232,7 @@
   },
   "pop-rock-alternatif-et-inde": {
     "variants": ["Pop, Rock, Alternatif et Indé"],
-    "parts": ["pop", "rock", "alternatif-et-inde"],
+    "parts": ["pop", "rock", "alternatif", "inde"],
     "primary": "pop"
   },
   "pop-rock-alternative-and-indie": {
@@ -6381,7 +6389,7 @@
     "variants": ["Powerful"]
   },
   "powerpop": {
-    "variants": ["Powerpop"]
+    "variants": ["PowerPop", "Powerpop"]
   },
   "powerpop-90s": {
     "variants": ["Powerpop 90s"]
@@ -6389,13 +6397,8 @@
   "powerviolence": {
     "variants": ["Powerviolence"]
   },
-  "praise": {
-    "variants": ["Praise"]
-  },
   "praise-and-worship": {
-    "variants": ["Praise & Worship"],
-    "parts": ["praise", "worship"],
-    "primary": "praise"
+    "variants": ["Praise & Worship"]
   },
   "prank-calls": {
     "variants": ["Prank Calls"]
@@ -6448,6 +6451,9 @@
   },
   "progressive-country": {
     "variants": ["Progressive Country"]
+  },
+  "progressive-death-metal": {
+    "variants": ["Progressive Death Metal"]
   },
   "progressive-electronic": {
     "variants": ["Progressive Electronic"]
@@ -6956,6 +6962,9 @@
     "parts": ["rnb", "swing", "fusion", "electro", "pop-rock", "disco"],
     "primary": "rnb"
   },
+  "rnb-swing": {
+    "variants": ["Rnb Swing"]
+  },
   "rock": {
     "variants": ["Rock", "rock"]
   },
@@ -7012,11 +7021,16 @@
     "parts": ["rock", "classic-rock"],
     "primary": "rock"
   },
+  "rock-duro": {
+    "variants": ["Rock Duro"]
+  },
   "rock-duro-y-heavy": {
-    "variants": ["Rock Duro Y Heavy"]
+    "variants": ["Rock Duro Y Heavy"],
+    "parts": ["rock-duro", "heavy"],
+    "primary": "rock-duro"
   },
   "rock-en-espanol": {
-    "variants": ["Rock en Español"]
+    "variants": ["rock en español", "Rock en Español"]
   },
   "rock-experimentalrock": {
     "variants": ["Rock - ExperimentalRock"]
@@ -7025,7 +7039,18 @@
     "variants": ["Rock Folk"]
   },
   "rock-gothic-rock-glam-rock-hard-rock-gothnroll-gothic-metal-finnish-metal-pop-metal": {
-    "variants": ["Rock | Gothic Rock | Glam Rock | Hard Rock | Goth'n'Roll | Gothic Metal | Finnish Metal | Pop Metal"]
+    "variants": ["Rock | Gothic Rock | Glam Rock | Hard Rock | Goth'n'Roll | Gothic Metal | Finnish Metal | Pop Metal"],
+    "parts": [
+      "rock",
+      "gothic-rock",
+      "glam-rock",
+      "hard-rock",
+      "gothnroll",
+      "gothic-metal",
+      "finnish-metal",
+      "pop-metal"
+    ],
+    "primary": "rock"
   },
   "rock-music": {
     "variants": ["Rock Music"]
@@ -7043,7 +7068,7 @@
   },
   "rock-pop-alternatif-et-inde": {
     "variants": ["Rock, Pop, Alternatif et Indé"],
-    "parts": ["rock", "pop", "alternatif-et-inde"],
+    "parts": ["rock", "pop", "alternatif", "inde"],
     "primary": "rock"
   },
   "rock-psicodelico": {
@@ -7058,7 +7083,9 @@
     "variants": ["Rock→Rock"]
   },
   "rock-y-alternativo": {
-    "variants": ["Rock y Alternativo"]
+    "variants": ["Rock y Alternativo"],
+    "parts": ["rock", "alternativo"],
+    "primary": "rock"
   },
   "rockabilly": {
     "variants": ["Rockabilly"]
@@ -7181,9 +7208,6 @@
   },
   "screamo": {
     "variants": ["Screamo"]
-  },
-  "screen": {
-    "variants": ["Screen"]
   },
   "screwed": {
     "variants": ["Screwed"]
@@ -7312,13 +7336,8 @@
   "sing-songwriter": {
     "variants": ["Sing-Songwriter"]
   },
-  "singer": {
-    "variants": ["Singer"]
-  },
   "singer-and-songwriter": {
-    "variants": ["Singer & Songwriter"],
-    "parts": ["singer", "songwriter"],
-    "primary": "singer"
+    "variants": ["Singer & Songwriter"]
   },
   "singer-songwriter": {
     "variants": ["Singer - Songwriter", "Singer-Songwriter"]
@@ -7431,9 +7450,6 @@
   },
   "songster": {
     "variants": ["Songster"]
-  },
-  "songwriter": {
-    "variants": ["Songwriter"]
   },
   "sonidero": {
     "variants": ["Sonidero"]
@@ -7603,13 +7619,8 @@
   "spirituals": {
     "variants": ["Spirituals"]
   },
-  "spoken": {
-    "variants": ["Spoken"]
-  },
   "spoken-and-audio": {
-    "variants": ["Spoken & Audio"],
-    "parts": ["spoken", "audio"],
-    "primary": "spoken"
+    "variants": ["Spoken & Audio"]
   },
   "spoken-word": {
     "variants": ["Spoken Word"]
@@ -7635,13 +7646,8 @@
   "spy-music": {
     "variants": ["Spy Music"]
   },
-  "stage": {
-    "variants": ["Stage"]
-  },
   "stage-and-screen": {
-    "variants": ["Stage & Screen"],
-    "parts": ["stage", "screen"],
-    "primary": "stage"
+    "variants": ["Stage & Screen"]
   },
   "stage-musicals": {
     "variants": ["Stage Musicals"]
@@ -7740,8 +7746,13 @@
   "sunshine-pop": {
     "variants": ["Sunshine Pop"]
   },
+  "superpop": {
+    "variants": ["SuperPop"]
+  },
   "superpop-powerpop-beatlesque": {
-    "variants": [":SuperPop:PowerPop:Beatlesque"]
+    "variants": [":SuperPop:PowerPop:Beatlesque"],
+    "parts": ["superpop", "powerpop", "beatlesque"],
+    "primary": "superpop"
   },
   "surf": {
     "variants": ["Surf"]
@@ -7928,7 +7939,9 @@
     "variants": ["Techno Bass"]
   },
   "techno-dub-techno": {
-    "variants": ["Techno | Dub Techno"]
+    "variants": ["Techno | Dub Techno"],
+    "parts": ["techno", "dub-techno"],
+    "primary": "techno"
   },
   "techno-industrial": {
     "variants": ["Techno Industrial", "Techno-Industrial"]
@@ -8015,9 +8028,6 @@
     "variants": ["Thrash Metal, Groove Metal"],
     "parts": ["thrash-metal", "groove-metal"],
     "primary": "thrash-metal"
-  },
-  "thrash-metal-nu-metal": {
-    "variants": ["Thrash Metal | Nu-Metal"]
   },
   "thrash-metal-speed-metal-black-metal-heavy-metal-german-thrash-metal-blackened-thrash-metal-melodic-thrash-metal": {
     "variants": [
@@ -8116,7 +8126,7 @@
   "traditional-jazz-and-new-orleans": {
     "variants": ["Traditional Jazz & New Orleans"],
     "parts": ["traditional-jazz", "new-orleans"],
-    "primary": "traditional-jazz"
+    "primary": "new-orleans"
   },
   "traditional-metal": {
     "variants": ["Traditional Metal"]
@@ -8594,9 +8604,6 @@
   },
   "worldwide": {
     "variants": ["Worldwide"]
-  },
-  "worship": {
-    "variants": ["Worship"]
   },
   "wrestling": {
     "variants": ["Wrestling"]

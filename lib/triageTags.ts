@@ -2,24 +2,26 @@
 // TRIAGE TAGS
 // ======================================================================
 //
-// Stateless. Reads CONFIG.candidatesFile and CONFIG.curatedFile, and prints every candidate slug not yet
-// present anywhere in the curated data (not a canonical key, alias, related tag, or junk entry) - the
-// review queue for the curation pass described in spec.md §4.
-//
-// "Already decided" == "present in curated" - there is no separate seen/state file. Once a slug is added
-// to data/3-tags-curated.json (in any of its four places), it stops appearing here.
+// Stateless. Lists the canonical tags that are NEW since the last committed data/4-tags-resolved.json -
+// i.e. tags the rules could not map onto an existing image, which will therefore get their own generated
+// image unless a human says otherwise. That's the one decision point in the pipeline: for each new tag,
+// either accept it (do nothing - committing marks it reviewed), map it onto an existing tag's image, mark
+// it junk, or - if it's a pattern - add a word to config/ so the rules catch it next time.
 //
 // Usage:
 //   npm run tags:triage              - human-readable list to stdout
-//   npm run tags:triage -- --json    - writes CONFIG.jsonOutputFile instead, for batch curation
-//   npm run tags:triage -- --prompt  - writes CONFIG.promptOutputFile: a single self-contained prompt
-//     (curation rules extracted from spec.md §4, the undecided candidates, and exact output instructions)
-//     - paste its contents into a Claude chat to get back an updated data/3-tags-curated.json
+//   npm run tags:triage -- --json    - writes CONFIG.jsonOutputFile instead (gitignored, transient)
+//   npm run tags:triage -- --prompt  - writes CONFIG.promptOutputFile: a self-contained prompt (the rules
+//     quoted live from spec.md, the new tags, the existing canonical tags to map onto, and exact editing
+//     instructions) - paste its contents into a Claude chat
 
 import chalk from 'chalk';
 import fs from 'fs';
 
-import { type CanonicalEntry, loadCurated } from './curatedTags.ts';
+import { loadConfig } from './config.ts';
+import { loadCurated } from './curatedTags.ts';
+import { type Candidates, buildResolvedMap, createResolver } from './resolveTag.ts';
+import { diffResolved, loadBaseline } from './resolvedBaseline.ts';
 
 // ======================================================================
 // CONFIG
@@ -28,154 +30,131 @@ import { type CanonicalEntry, loadCurated } from './curatedTags.ts';
 const CONFIG = {
   candidatesFile: './data/2-candidates.json',
   curatedFile: './data/3-tags-curated.json',
+  resolvedFile: './data/4-tags-resolved.json',
   jsonOutputFile: './data/tags-triage.json',
   promptOutputFile: './data/curation-prompt.md',
 
-  // Curation rules are kept in spec.md (the single source of truth for them - see spec.md §4) rather than
-  // duplicated here. --prompt mode extracts the text between these two markers, which must exist verbatim
-  // as their own lines in spec.md, so the two can never silently drift apart.
+  // The curation rules live in spec.md (single source of truth). --prompt extracts the text between these
+  // two markers, which must exist verbatim in spec.md, so the prompt can never drift from the rules.
   specFile: './spec.md',
   specSectionStart: '## 4. Curation rules',
-  specSectionEnd: '## 5. Task list',
+  specSectionEnd: '## 5. ',
 };
 
 // ======================================================================
 // TYPES
 // ======================================================================
 
-type CandidateEntry = { variants: string[]; parts?: string[]; primary?: string };
-type TriageEntry = { slug: string; hasImage: boolean } & CandidateEntry;
+type TriageEntry = { slug: string; name: string; variants: string[]; parts?: string[]; primary?: string };
 
 // ======================================================================
-// MAIN
+// PROMPT
 // ======================================================================
 
-// Extracts the curation rules from spec.md, from CONFIG.specSectionStart up to (not including)
-// CONFIG.specSectionEnd, so --prompt mode always quotes the current rules rather than a copy that can
-// drift out of sync. Throws if either marker isn't found, rather than silently omitting the rules.
 function extractCurationRules(): string {
   const spec = fs.readFileSync(CONFIG.specFile, 'utf-8');
   const startIndex = spec.indexOf(CONFIG.specSectionStart);
-  const endIndex = spec.indexOf(CONFIG.specSectionEnd);
+  const endIndex = spec.indexOf(CONFIG.specSectionEnd, startIndex + 1);
 
-  if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex) {
+  if (startIndex === -1 || endIndex === -1) {
     throw new Error(
-      `Could not find curation rules in ${CONFIG.specFile} - expected "${CONFIG.specSectionStart}" ... "${CONFIG.specSectionEnd}"`
+      `Could not find curation rules in ${CONFIG.specFile} - expected "${CONFIG.specSectionStart}" … "${CONFIG.specSectionEnd}"`
     );
   }
 
   return spec.slice(startIndex, endIndex).trim();
 }
 
-function buildCurationPrompt(undecided: TriageEntry[]): string {
-  const rules = extractCurationRules();
+function buildCurationPrompt(entries: TriageEntry[], canonical: string[]): string {
+  return `You are reviewing new tags for the Chromatix Assets repository (read AGENTS.md and spec.md for context).
 
-  return `You are curating tags for the Chromatix Assets repository. Read AGENTS.md and spec.md in this repo
-for full context if you need it, but the rules you need are quoted below.
-
-${rules}
+${extractCurationRules()}
 
 ## Your task
 
-Below is the current list of undecided candidate slugs (from \`npm run tags:triage -- --json\`), each with
-its raw variant string(s), and whether it's a compound (\`parts\`/\`primary\`) or already has a generated
-image (\`hasImage\`).
+The tags below are NEW canonical tags: the automatic rules could not map them onto an existing tag's image,
+so each will get its own generated image unless you decide otherwise. For each one, pick exactly one:
 
-Apply the curation rules above to classify **every** slug below into exactly one of: \`canonical\`, an
-\`aliases\` entry of a canonical tag, a \`related\` entry of a canonical tag, or \`junk\`.
+- **Accept** it as its own tag: do nothing.
+- **Same tag as an existing one** (typo, translation, acronym, alternative wording): add its slug to that
+  existing tag's \`"aliases"\` array in \`data/3-tags-curated.json\`. Create the entry
+  \`"<existing-slug>": { "aliases": [], "related": [] }\` under \`"canonical"\` if it isn't there yet.
+- **A niche variant that should share an existing tag's image**: same, but in \`"related"\`.
+- **Not a genre/mood/style at all** (artist, label, note, placeholder): add its slug to the top-level \`"junk"\` array.
+- **A systemic pattern** (a modifier word that should always be stripped, a delimiter the splitter misses,
+  an "X & Y" name that must not be split): edit the matching file in \`config/\` instead - the rules will
+  then handle every current and future tag with that pattern.
 
-Then edit \`data/3-tags-curated.json\` directly to add your decisions:
-- New canonical tag: add a key under \`"canonical"\`, e.g. \`"some-slug": { "name": "Some Slug", "aliases": [], "related": [] }\`.
-- Alias/related of an EXISTING canonical tag: append the slug to that entry's \`"aliases"\` or \`"related"\` array.
-- Alias/related of a canonical tag you're ALSO adding in this same batch: still just append it to that new
-  entry's array - don't create a separate entry for it.
-- Junk: append the slug (just the string) to the top-level \`"junk"\` array.
+The existing canonical tags you can map onto are listed at the end. Keep JSON keys/arrays sorted, don't
+touch existing entries, then run \`npm run tags:build\` to validate and rebuild.
 
-Every slug below must end up in exactly one of those places - none should be left undecided. Keep both
-arrays/objects sorted alphabetically by key/value, matching the existing file's style. Do not touch any
-existing entries. When you're done, run \`npm run tags:build\` to verify the file is still valid (it throws
-on any slug appearing in more than one place) and to regenerate \`data/4-tags-resolved.json\`.
-
-## Undecided candidates (${undecided.length})
+## New canonical tags (${entries.length})
 
 \`\`\`json
-${JSON.stringify(undecided, null, 2)}
+${JSON.stringify(entries, null, 2)}
 \`\`\`
+
+## Existing canonical tags (${canonical.length})
+
+${canonical.join(', ')}
 `;
 }
+
+// ======================================================================
+// MAIN
+// ======================================================================
 
 function main(): void {
   const asJson = process.argv.includes('--json');
   const asPrompt = process.argv.includes('--prompt');
 
-  if (!asJson && !asPrompt) {
-    console.log(chalk.bgCyan('# Triaging candidates'));
-  }
-
-  const candidates: Record<string, CandidateEntry> = JSON.parse(fs.readFileSync(CONFIG.candidatesFile, 'utf-8'));
+  const config = loadConfig();
   const curated = loadCurated(CONFIG.curatedFile);
+  const candidates: Candidates = JSON.parse(fs.readFileSync(CONFIG.candidatesFile, 'utf-8'));
+  const resolver = createResolver(candidates, curated, config);
+  const resolved = buildResolvedMap(candidates, resolver);
+  const diff = diffResolved(loadBaseline(CONFIG.resolvedFile), resolved);
 
-  const decided = new Set<string>();
-
-  for (const [slug, entry] of Object.entries(curated.canonical) as [string, CanonicalEntry][]) {
-    decided.add(slug);
-    entry.aliases.forEach((s) => decided.add(s));
-    entry.related.forEach((s) => decided.add(s));
-  }
-
-  curated.junk.forEach((s) => decided.add(s));
-
-  const imageDir = './assets/tags/community';
-  const existingImages = new Set(
-    fs
-      .readdirSync(imageDir)
-      .filter((file) => file.endsWith('.jpg'))
-      .map((file) => file.slice(0, -'.jpg'.length))
-  );
-
-  const undecided: TriageEntry[] = Object.entries(candidates)
-    .filter(([slug]) => !decided.has(slug))
-    .map(([slug, entry]) => ({ slug, hasImage: existingImages.has(slug), ...entry }))
-    .sort((a, b) => a.slug.localeCompare(b.slug, undefined, { sensitivity: 'base' }));
+  const entries: TriageEntry[] = diff.addedCanonical.map((slug) => ({
+    slug,
+    name: resolver.displayName(slug),
+    ...candidates[slug],
+  }));
+  const existingCanonical = Object.keys(resolved)
+    .filter((slug) => resolved[slug] === slug && !diff.addedCanonical.includes(slug))
+    .sort();
 
   if (asJson) {
-    fs.writeFileSync(CONFIG.jsonOutputFile, `${JSON.stringify(undecided, null, 2)}\n`);
-    console.log(chalk.bgCyan(`✓ ${CONFIG.jsonOutputFile} written with ${undecided.length} undecided slug(s)`));
+    fs.writeFileSync(CONFIG.jsonOutputFile, `${JSON.stringify(entries, null, 2)}\n`);
+    console.log(chalk.bgCyan(`✓ ${CONFIG.jsonOutputFile} written with ${entries.length} new canonical tag(s)`));
     return;
   }
 
   if (asPrompt) {
-    if (undecided.length === 0) {
-      console.log(chalk.bgCyan('✓ Nothing undecided - no prompt needed'));
+    if (entries.length === 0) {
+      console.log(chalk.bgGreen('✓ No new canonical tags - nothing to review, no prompt written'));
       return;
     }
 
-    fs.writeFileSync(CONFIG.promptOutputFile, buildCurationPrompt(undecided));
+    fs.writeFileSync(CONFIG.promptOutputFile, buildCurationPrompt(entries, existingCanonical));
     console.log(
       chalk.bgCyan(
-        `✓ ${CONFIG.promptOutputFile} written with ${undecided.length} undecided slug(s) - paste its contents into a Claude chat`
+        `✓ ${CONFIG.promptOutputFile} written with ${entries.length} new canonical tag(s) - paste its contents into a Claude chat`
       )
     );
     return;
   }
 
-  for (const entry of undecided) {
-    const flags = [
-      entry.hasImage ? chalk.dim('has-image') : chalk.yellow('no-image'),
-      entry.parts ? chalk.cyan(`compound → primary "${entry.primary}"`) : null,
-    ].filter(Boolean);
+  console.log(chalk.bgCyan('# New canonical tags since last commit'));
 
-    console.log(`${chalk.bold(entry.slug)} ${flags.join(' ')}`);
+  for (const entry of entries) {
+    const flags = entry.parts ? chalk.cyan(`compound → primary "${entry.primary}"`) : '';
+
+    console.log(`${chalk.bold(entry.slug)} ${chalk.dim(`"${entry.name}"`)} ${flags}`);
     console.log(chalk.dim(`  variants: ${entry.variants.join(', ')}`));
-
-    if (entry.parts) {
-      console.log(chalk.dim(`  parts: ${entry.parts.join(', ')}`));
-    }
   }
 
-  console.log(
-    chalk.bgCyan(`\n✓ ${undecided.length} undecided candidate(s) of ${Object.keys(candidates).length} total`)
-  );
+  console.log(chalk.bgCyan(`\n✓ ${entries.length} new canonical tag(s) to review`));
 }
 
 main();

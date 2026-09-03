@@ -1,0 +1,5 @@
+{
+  "description": "How a raw tag string that is really several tags joined together gets split. 'separators' split wherever they appear ('Rock, Pop', 'Death Metal | Deathcore', 'Jazz+Funk'). 'connectors' are words/symbols that only count as a join when surrounded by whitespace, so 'R&B' and 'D&B' stay whole while 'Ambient & Drone' and 'Rock y Alternativo' split. Phrases listed in compound-tags.json are protected from splitting even if they contain a connector.",
+  "separators": [",", "|", "/", "+", "_", ":", ";"],
+  "connectors": ["&", "and", "y", "et", "und", "e"]
+}

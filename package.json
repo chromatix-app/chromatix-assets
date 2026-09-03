@@ -10,7 +10,7 @@
     "tags:candidates": "node lib/buildCandidates.ts",
     "tags:triage": "node lib/triageTags.ts",
     "tags:build": "node lib/buildResolved.ts",
-    "tags:update": "npm run tags:fetch && npm run tags:candidates && npm run tags:triage && npm run tags:build",
+    "tags:update": "npm run tags:fetch && npm run tags:candidates && npm run tags:build",
     "tags:generate": "node lib/tagImageGenerator.ts",
     "knip": "knip",
     "lint": "eslint . --cache",

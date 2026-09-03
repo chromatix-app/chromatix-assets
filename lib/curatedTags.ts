@@ -1,14 +1,17 @@
 // ======================================================================
-// CURATED TAGS
+// CURATED TAGS (EXCEPTIONS)
 // ======================================================================
 //
-// Loads and validates data/3-tags-curated.json - the only durable, hand/LLM-edited file in the tag
-// resolution design (see spec.md §3.2). Every other data file (2-candidates.json, 4-tags-resolved.json) is
-// mechanically derived; this one is not, so it's validated on every load rather than trusted blindly.
+// Loads and validates data/3-tags-curated.json - the hand-maintained exceptions to the automatic
+// resolution rules (see lib/resolveTag.ts). Everything the rules can derive on their own (the large
+// majority of tags) is NOT in this file; it only holds what a human decided the rules get wrong:
+//   - canonical: pin a tag as its own image (overriding a rule that would collapse it), and/or give it a
+//     display name the generator should use instead of the derived one
+//   - aliases / related: map a slug to another tag's image when no rule derives it (typos, translations,
+//     acronyms, editorial "this niche tag borrows that image" calls)
+//   - junk: strings that are not a genre/mood/style but can't be caught structurally (artists, labels)
 //
-// A slug may appear in at most one place across: a canonical key, an alias (of any canonical entry), a
-// related tag (of any canonical entry), or junk. Every alias/related target must itself be a canonical
-// key (no chains - an alias can't point at another alias).
+// A slug may appear in at most one place across canonical keys / aliases / related / junk.
 
 import fs from 'fs';
 
@@ -16,7 +19,7 @@ import fs from 'fs';
 // TYPES
 // ======================================================================
 
-export type CanonicalEntry = { name: string; aliases: string[]; related: string[] };
+type CanonicalEntry = { name?: string; aliases: string[]; related: string[] };
 export type CuratedTags = { canonical: Record<string, CanonicalEntry>; junk: string[] };
 
 // ======================================================================
@@ -47,9 +50,10 @@ export function loadCurated(path: string = DEFAULT_CURATED_FILE): CuratedTags {
 // ======================================================================
 
 /**
- * Validates a curated tags structure, returning a list of human-readable problems (empty if valid):
- * every slug (canonical key, alias, related, junk) appears in at most one place, and every alias/related
- * target is itself a canonical key (not another alias, not missing).
+ * Validates a curated tags structure, returning a list of human-readable problems (empty if valid): every
+ * slug (canonical key, alias, related, junk) appears in at most one place, and every entry's arrays are
+ * present. Whether an alias/related target actually exists is checked at build time (lib/resolveTag.ts),
+ * since targets may be tags the rules derive rather than keys in this file.
  * @param curated - The curated tags data to validate
  * @returns A list of validation error messages, empty if the data is valid
  */
@@ -67,11 +71,16 @@ export function validateCurated(curated: CuratedTags): string[] {
     }
   };
 
-  for (const [slug] of Object.entries(curated.canonical)) {
+  for (const slug of Object.keys(curated.canonical)) {
     claim(slug, 'canonical');
   }
 
   for (const [slug, entry] of Object.entries(curated.canonical)) {
+    if (!Array.isArray(entry.aliases) || !Array.isArray(entry.related)) {
+      errors.push(`"${slug}" must have "aliases" and "related" arrays`);
+      continue;
+    }
+
     for (const alias of entry.aliases) {
       claim(alias, `alias of "${slug}"`);
     }
@@ -86,30 +95,4 @@ export function validateCurated(curated: CuratedTags): string[] {
   }
 
   return errors;
-}
-
-// ======================================================================
-// RESOLUTION
-// ======================================================================
-
-/**
- * Resolves a slug to its canonical slug: the slug itself if it's already canonical, the canonical slug it
- * aliases or relates to, or null if the slug is junk or not present in the curated data at all (an
- * undecided candidate - see spec.md §3.3, lib/triageTags.ts).
- * @param curated - The curated tags data (see loadCurated)
- * @param slug - The slug to resolve
- * @returns The canonical slug, or null if there is none
- */
-export function resolveSlug(curated: CuratedTags, slug: string): string | null {
-  if (curated.canonical[slug]) {
-    return slug;
-  }
-
-  for (const [canonicalSlug, entry] of Object.entries(curated.canonical)) {
-    if (entry.aliases.includes(slug) || entry.related.includes(slug)) {
-      return canonicalSlug;
-    }
-  }
-
-  return null;
 }

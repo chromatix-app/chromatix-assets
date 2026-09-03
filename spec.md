@@ -1,8 +1,7 @@
-# Tag Resolution — Spec & Implementation Plan
+# Tag Resolution — Spec
 
-Companion to AGENTS.md. This file is the source of truth for the tag-resolution rework: what we're solving, the
-design, the curation rules, and the exact task list. AGENTS.md describes whatever the code currently does and
-must be rewritten at the end of the task list (task 9).
+Companion to AGENTS.md. This file is the source of truth for the _design_ of tag resolution: what we're solving,
+the rules, and what's deliberately deferred. AGENTS.md describes the code as it is today.
 
 ## 1. Goal
 
@@ -10,165 +9,121 @@ Every raw tag string a Chromatix user has (genre/mood/style, free text, thousand
 must resolve to one thumbnail image, while the set of images we _generate and curate_ stays small and stops
 growing with junk. Constraints:
 
-- **Deterministic at runtime**: given a tag string, the image is a fixed function of string + shipped data.
-- **Bounded**: new junk/variant tags cost zero generation and zero curation beyond a one-line decision.
-- **Judgement is allowed, but only once and only in data**: classification (is this junk? is this a spelling of
-  Rock?) may be done by a human or an LLM, but the result is frozen into `data/3-tags-curated.json`. Nothing at
-  build or run time re-decides it.
+- **Deterministic and future-proof**: resolution is a pure function of the tag string, the raw tag data, and the
+  lists in `config/` plus the small exceptions file. It never depends on which image files happen to exist. Same
+  inputs → same map, today or in a year; change a config list → every affected tag re-resolves on the next build.
+- **Config, not code**: every word list (blocklist, modifiers, delimiters, protected compound names) is a JSON file
+  in `config/` with its own description. Code contains rules, never lists.
+- **Bounded**: a new junk/variant/modifier tag costs zero generation. Only a genuinely new canonical tag gets an
+  image, and a human sees those before they're generated.
+- **Judgement is data**: where a rule can't decide (typos, translations, "this niche tag should borrow that
+  image", junk that isn't structurally detectable), a human/LLM records the decision once in
+  `data/3-tags-curated.json`. Everything else is derived.
 
-## 2. Facts (measured 2026-09-03, updated after the §5 task-list pass — re-measure, don't trust)
+## 2. Facts (measured 2026-09-03 after the rules rework — re-measure, don't trust)
 
-- `data/1-tags-raw.json` grew from 1,935 to 2,573 raw strings mid-implementation (real new data, not corruption -
-  see §5 task 1's note). `data/2-candidates.json`: 2,579 candidate slugs, 438 compounds.
-- `data/3-tags-curated.json` (post-curation): 2,065 canonical, 373 aliases, 141 junk, 0 undecided.
-- `data/4-tags-resolved.json`: 2,065 canonical, 373 aliases. 459 canonical slugs have no image yet (tags:generate's
-  queue). `assets/tags/community/`: originally 1,868 images; `tags:build` copied 131 more for aliases.
-- Slug collisions between distinct tags: 0, re-verified across the full 2,579-slug curated set (every slug in
-  `3-tags-curated.json` is unique - `curatedTags.ts`'s validation enforces this on every load).
-- The Chromatix app resolves `slugifyTagName(tag)` → `<slug>.jpg`, with a fallback image on load error. It does
-  not fetch any JSON today. Alex is willing to change the app.
-- The API returns tag names only — no counts, no genre/mood/style field. Frequency filtering is impossible for
-  now; mood-vs-genre must be decided in curation.
-- ~285 raw tags are several tags joined by `,` / `&` / `and`. But Plex/AllMusic mood tags are also `"X & Y"`
-  (`Calm & Peaceful`) and are ONE tag — a splitter can't tell these apart; curation must.
-- `references/` reference tiers and the Gemini generator work; leave them alone.
+- `data/1-tags-raw.json`: 2,574 raw strings → `data/2-candidates.json`: 2,577 slugs, 440 compounds.
+- Resolved: **1,712 canonical** (own image), 730 sharing another tag's image, 135 junk. Down from 2,066 canonical
+  under the previous "everything with an image is canonical" curation.
+- `data/3-tags-curated.json` (exceptions only): 97 canonical entries (name overrides, pins, alias/related
+  targets), 135 junk.
+- 400 canonical slugs have no image yet (`tags:generate` queue). 71 existing images are for slugs that are no
+  longer canonical (orphans - report only, delete in a reviewed commit).
+- The app resolves `slugifyTagName(tag)` → `<slug>.jpg` with a fallback image on load error; it does not fetch
+  JSON yet. The API returns tag names only (no counts, no genre/mood/style field).
 
 ## 3. Design
 
 ### 3.1 Runtime contract (app side)
 
 ```
-slug = slugifyTagName(tag)
-target = resolved[slug] ?? null
-image = target ? `${CDN}/assets/tags/community/${target}.jpg` : FALLBACK
+slug   = slugifyTagName(tag)
+target = resolved[slug]          // data/4-tags-resolved.json, { [slug]: canonicalSlug }
+image  = target ? `${CDN}/assets/tags/community/${target}.jpg` : FALLBACK
 ```
 
-`data/4-tags-resolved.json` is deployed from this repo as a single flat map: `{ [slug]: canonicalSlug }` - every
-known slug (canonical or alias/related) maps directly to its canonical slug; a canonical slug maps to itself. One
-lookup, no branching, and it scales to resolving hundreds of tags at once (the app's actual use case) with no extra
-cost - it's still just one object-key lookup per tag. Junk tags are absent → fallback (the app may later choose to
-hide them). This was originally a two-part `{ canonical: string[], aliases: {...} }` shape; flattened after review
-made clear the app never needs to distinguish "canonical" from "alias" at lookup time, only "what slug do I load".
+One flat map, one lookup per tag, no branching - scales to resolving hundreds of tags at once. Canonical slugs
+map to themselves; junk is absent (→ fallback). Until the app reads the JSON, `tags:build` copies each canonical
+image to its sharing slugs so they work under the current filename-only lookup.
 
-Until the app is updated, `tags:build` also **copies** each canonical image to its alias slugs
-(`rock.jpg` → `rok.jpg`), so aliases work with the current app. Git dedups identical blobs; the copies can be
-deleted once the app uses the JSON.
+### 3.2 Files
 
-### 3.2 Data model
+| File                        | Role                                                                         |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| `config/blocklist.json`     | Config. Structurally-valid strings that are never a tag ("Misc", "Test").    |
+| `config/delimiters.json`    | Config. Separators and whitespace-bounded connectors that split a multi-tag. |
+| `config/compound-tags.json` | Config. "X & Y" names that must not be split ("drum & bass").                |
+| `config/modifiers.json`     | Config. Prefix/suffix words stripped to find the tag whose image to share.   |
+| `data/1-tags-raw.json`      | Input. Every raw string the API has ever returned. Append-only.              |
+| `data/2-candidates.json`    | Derived. Valid tags by slug, compounds split into parts with a primary.      |
+| `data/3-tags-curated.json`  | **Durable, hand-edited.** Exceptions only - see §4.                          |
+| `data/4-tags-resolved.json` | Derived, deployed. The flat map above. Committing it = "reviewed".           |
 
-- `data/1-tags-raw.json` — unchanged. Raw, unfiltered, append-only, from `tags:fetch`.
-- `data/blocklist.json` — unchanged. Hand list of structurally-valid but meaningless strings. (Kept separate
-  from `junk` below because it's applied _before_ splitting, so `"Rock, Misc"` still yields `rock`.)
-- `data/2-candidates.json` — **derived, stateless, regenerated every run**. Output of `tags:candidates`:
-  ```json
-  {
-    "adult-alternative-pop-and-rock": {
-      "variants": ["Adult Alternative Pop & Rock"],
-      "parts": ["adult-alternative-pop", "rock"],
-      "primary": "rock"
-    },
-    "rock": { "variants": ["Rock", "rock", "ROCK"] }
-  }
-  ```
-  Keyed by slug. `parts`/`primary` present only for compounds. Parts are also added as their own candidate slugs.
-- `data/3-tags-curated.json` — **the only durable, hand/LLM-edited file**:
-  ```json
-  {
-    "canonical": { "rock": { "name": "Rock", "aliases": ["rok", "general-rock"], "related": ["meme-rock"] } },
-    "junk": ["misc", "tyler-the-creator"]
-  }
-  ```
-  `aliases` = same tag, different string (spelling, casing already collapsed, translation, acronym, genre-list
-  compound). `related` = a different, minor tag that borrows this image instead of getting its own. Both resolve
-  identically at runtime; the split exists so future review can revisit `related` (editorial) separately from
-  `aliases` (factual). Every slug appears in at most one place across canonical keys / aliases / related / junk.
-- `data/4-tags-resolved.json` — **derived** by `tags:build`, deployed. Flattening of the above.
+### 3.3 Resolution rules (`lib/resolveTag.ts`), first match wins
 
-### 3.3 Scripts
+1. **Exceptions** (`3-tags-curated.json`): junk → no image; explicit alias/related → that tag's image; a
+   canonical key → pinned as its own image (overrides every rule below - this is how "german-folk is its own
+   thing" is expressed if a modifier would otherwise strip it) and may carry a display-name override.
+2. **Hyphenation**: slugs identical once hyphens are removed are one tag. The representative is a pinned member if
+   there is one, else the fewest-hyphen spelling (stable; which spelling holds the file is invisible to the app).
+3. **Modifiers** (`config/modifiers.json`): strip a listed prefix from the start or suffix from the end, repeatedly,
+   while the remainder is a known tag; the tag then shares the remainder's image (`classic-rock` → `rock`,
+   `acoustic-music` → `acoustic`). Only listed words are ever stripped - `death-metal` stays `death-metal`.
+4. **Compound** (`2-candidates.json` parts): a tag that split into several shares its primary part's image
+   (`lib/selectPrimaryTag.ts`: first part not led by a modifier); a junk part is skipped; all-junk → junk.
+5. Otherwise **canonical**: its own image.
 
-| Script            | Reads                                                    | Writes                                                    | Stateful?              |
-| ----------------- | -------------------------------------------------------- | --------------------------------------------------------- | ---------------------- |
-| `tags:fetch`      | API                                                      | `1-tags-raw.json`                                         | append-only (existing) |
-| `tags:candidates` | raw, blocklist                                           | `2-candidates.json`                                       | no                     |
-| `tags:triage`     | candidates, curated                                      | stdout                                                    | no                     |
-| `tags:build`      | curated, images                                          | `4-tags-resolved.json`, alias image copies, stdout report | no                     |
-| `tags:generate`   | `4-tags-resolved.json` (canonical minus existing images) | images                                                    | existing               |
+Every rule that points at another slug resolves that slug recursively, so chains and overrides compose.
 
-`tags:triage` prints candidate slugs not present anywhere in curated (with variants, parts, primary, and whether an
-image already exists). That list is the review queue. There is no `-seen` state: "already decided" == "present
-in curated".
+### 3.4 Scripts
 
-`tags:build` also reports: canonical slugs with no image (generator input), images whose slug is in `junk` or
-is an alias/related (candidates for deletion — never auto-deleted), and curated slugs that no longer appear in
-candidates (informational).
+| Script                   | Reads                               | Writes                                                        |
+| ------------------------ | ----------------------------------- | ------------------------------------------------------------- |
+| `tags:fetch`             | API                                 | `1-tags-raw.json` (append)                                    |
+| `tags:candidates`        | raw, config                         | `2-candidates.json`                                           |
+| `tags:build`             | candidates, curated, config, images | `4-tags-resolved.json`, shared image copies, reports, verdict |
+| `tags:update`            | —                                   | fetch → candidates → build                                    |
+| `tags:triage [--prompt]` | same as build + git HEAD            | stdout, or `data/curation-prompt.md`                          |
+| `tags:generate`          | resolved, candidates, curated       | images for canonical slugs without one                        |
 
-## 4. Curation rules (for the LLM/human pass and for `tags:triage` follow-ups)
+"New" means "not in the last **committed** `4-tags-resolved.json`" (`lib/resolvedBaseline.ts`) - git is the
+memory, there is no seen-file. `tags:build` ends with a verdict: nothing to review, or the exact next commands.
 
-Apply in order to each undecided candidate slug:
+## 4. Curation rules (what a human/LLM decides, and how to record it)
 
-1. **Junk** if it is not a genre/mood/style: artist, label (`matador-records`), venue/city (`porto`), playlist or
-   personal note (`favourite-boris`, `full-albums`), placeholder (`default`, `various`, `what`, `genre`), profanity
-   noise, or a bare word that only exists as split debris with no standalone meaning (`central`, `south`, `and-country`).
-   `music`/`musik` alone is junk. Era words alone (`classic`) are junk; decades (`eighties`) are fine.
-2. **Alias** if it is the same tag as an existing canonical: typo (`electrionic`), translation (`klassik`,
-   `musiques-du-monde`), acronym (`d-and-b`), `general-*` prefix (`general-rock`), or a **genre-list compound**
-   (`techno-and-house`, `blues-country-folk`) → alias of its `primary` (after resolving the primary itself; if the
-   primary is junk, use the next part). Prefer the slug that already has an image as canonical.
-3. **Single-tag compound**: `"X & Y"` that is one Plex/AllMusic/iTunes tag stays **canonical**: mood pairs
-   (`calm-and-peaceful`, `tense-and-anxious` — adjectives, not genres), fixed names (`drum-and-bass`,
-   `rock-and-roll`, `rhythm-and-blues` → alias of `r-and-b`, `country-and-irish`, `big-band-and-swing`,
-   `stage-and-screen` → alias of `soundtrack`, `folk-world-and-country`). Test: would anyone type only half of it?
-   AllMusic "Pop/Rock" styles arrive as `x-pop-and-rock` — alias to the nearest canonical (`pop-rock`, `alternative-rock`).
-4. **Related** if it is a real but very niche tag that doesn't warrant its own image (`mathematic-metal` →
-   `metal`, `kaballah-doom` → `doom-metal`). Use sparingly; when in doubt, canonical (it already has an image).
-5. Otherwise **canonical**, `name` = the best-cased variant (else Title Case of slug), no aliases.
+The rules above resolve everything automatically. A human only looks at **new canonical tags** - tags the rules
+could not map onto an existing image, which will therefore get their own generated image. For each one:
 
-Do not split moods. Do not merge distinct genres because they're similar (`deep-house` ≠ `tech-house`;
-`electronic` ≠ `electronica` — both stay canonical). Split halves of a single-tag compound go to `junk` unless
-they stand alone (`calm`, `anxious` are real moods → canonical).
+1. **Accept** it as a real, distinct genre/mood/style → do nothing. Committing marks it reviewed.
+2. **It is the same tag as an existing one** (typo `electrionic`, translation `klassik`, acronym `dnb`, alternative
+   wording) → add its slug to that tag's `"aliases"` in `data/3-tags-curated.json`.
+3. **It is a niche variant that should share an existing tag's image** (`kaballah-doom` → `doom-metal`) → add it to
+   that tag's `"related"`. Same runtime effect as an alias; kept separate so editorial calls can be revisited.
+4. **It is not a genre/mood/style** (artist, label, personal note, placeholder) → add it to `"junk"`.
+5. **It is a pattern**, not a one-off → fix the config instead, so every current and future tag with that pattern
+   is handled: a word that should always be stripped → `config/modifiers.json`; a join the splitter missed →
+   `config/delimiters.json`; an "X & Y" name being wrongly split → `config/compound-tags.json`; a placeholder
+   string → `config/blocklist.json`.
+6. **A rule got it wrong** (a modifier stripped something that is its own genre) → add the slug as a canonical key
+   in `3-tags-curated.json` to pin it; add `"name"` there too if the derived display name is poor.
 
-The seed already in `data/3-tags-curated.json` (114 canonical, 240 aliases, 60 junk) is the calibration set —
-follow its pattern. Undecided at seed time: 1,581 slugs, the large majority of which are rule 5.
+Do not merge distinct genres because they're similar (`deep-house` ≠ `tech-house`). Nationality/region words
+(`german-folk`, `texas-blues`) and texture words (`acoustic-`, `atmospheric-`) are deliberately NOT modifiers -
+they usually name a distinct style; add one to `config/modifiers.json` only if you want every such tag collapsed.
 
-## 5. Task list — DONE (2026-09-03)
+## 5. Status
 
-All nine tasks below are complete; `npm run check` is green. Kept here as a record of what was built and why,
-not as a to-do list.
-
-1. **`lib/buildCandidates.ts`** (`npm run tags:candidates`) — done. Stateless, uses `isValidTag`, `splitMultiTag`,
-   `selectPrimaryTag`, `slugifyTagName`; blocklist compared by slug. Note: the original acceptance fixture
-   (`data/2-candidates.json` as committed at planning time, ~1,935 raw tags) was stale by the time this ran —
-   `data/1-tags-raw.json` had grown to ~2,573 tags in the interim (real new data, confirmed by spot-check, not
-   corruption). The script's logic was validated against the _old_ data's shape instead, then run for real
-   against current data — 2,579 candidate slugs, 438 compounds. Re-verify this kind of thing whenever a "must
-   match X" instruction spans a raw data file that keeps growing.
-2. **`lib/curatedTags.ts`** — done, with `loadCurated`/`resolveSlug`/`validateCurated`, 12 unit tests.
-3. **`lib/triageTags.ts`** (`npm run tags:triage`, `-- --json`) — done.
-4. **`lib/buildResolved.ts`** (`npm run tags:build`) — done, including the alias image-copy step and three
-   reports (missing images, deletion candidates, stale curated slugs).
-5. **Generator** — done. Reads `4-tags-resolved.json` for the canonical slug list and `3-tags-curated.json` for each
-   slug's display name.
-6. **Curation pass** — done. 2,065 canonical / 373 aliases / 141 junk, 0 undecided against current
-   `2-candidates.json`. One correction made mid-pass and worth flagging for future curators: an early batch
-   miscategorized bare nationality/regional words (`irish`, `turkish`, `cuban`, `polish`, `ukrainian`, `persian`,
-   `english`, `british`, `salvadoran`, `zimbabwean`, `bahamian`) as junk — these are legitimate regional-music
-   genre tags in this data (same category as `african`, `japanese`, `korean`), not junk. Caught and fixed before
-   building `4-tags-resolved.json`; the lesson is to check a candidate against what's _already_ canonical before
-   bulk-classifying anything that looks like a plain noun/adjective.
-7. **Old pipeline deleted** — done. Removed `filterTags.ts`, `splitTags.ts`, `normalizeTags.ts`, `normalizeTag.ts`
-   (+ test), `data/2-*`, `data/3-*`, `data/4-*`.
-8. **Deploy config + README** — done. `.vercelignore` now allow-lists `data/4-tags-resolved.json`.
-9. **AGENTS.md rewritten** — done, matches the current pipeline.
-
-**Not yet done** (out of scope for this pass, tracked separately): the app-side switch to the §3.1 JSON lookup
-(Alex, app repo) — until then, the alias image copies from `tags:build` are load-bearing in production, not a
-stopgap. Once the app switches, the copies can be pruned with a small `tags:build --prune-copies` if wanted.
+Built and verified 2026-09-03: config directory, pure resolver with tests, config-driven splitter, git-baseline
+review verdict in `tags:build`, exceptions-only curated file (migrated from the previous full curation). Remaining,
+all operational: commit `data/4-tags-resolved.json` to establish the review baseline; run `tags:generate` for the
+400 canonical slugs without images; switch the app to the §3.1 lookup (separate repo), after which the shared
+image copies and the 71 orphan images can be deleted in a reviewed commit.
 
 ## 6. Deferred / not doing
 
-- Levenshtein/fuzzy suggestions in `tags:triage` — only if the queue after a fetch is ever big enough to hurt.
-- Language detection / machine translation — an LLM curation pass handles translations; no dependency needed.
-- Frequency threshold — needs API counts; revisit if the backend can expose them.
-- Genre/mood/style separation — needs the API field; would let the splitter skip moods automatically.
-- Deleting junk/alias images — `tags:build` reports them; deletion stays a manual, reviewable commit.
-- Nested-parenthetical compounds (`drum & bass (drill & bass)`) — one instance; handled by curation, not code.
+- Fuzzy/Levenshtein suggestions in triage — only if the review list after a fetch ever gets painful.
+- Machine translation — the LLM review handles the occasional foreign tag; `delimiters.json` already splits
+  foreign connectors (`y`, `et`, `und`, `e`).
+- Frequency threshold — needs API counts.
+- Genre/mood/style separation — needs the API field.
+- Automatic image deletion — reports only; deletion stays a reviewed commit.

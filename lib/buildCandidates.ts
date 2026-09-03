@@ -2,26 +2,23 @@
 // BUILD CANDIDATES
 // ======================================================================
 //
-// Stateless. Reads CONFIG.rawFile (every tag string the API has ever returned, unfiltered) and
-// CONFIG.blocklistFile, and writes CONFIG.outputFile: every valid tag, grouped by slug, with any
-// multi-tag string split into its individual parts (see lib/splitMultiTag.ts).
-//
-// This is fully regenerated on every run - there is no incremental/seen-file state. Re-running this
-// script is always safe and always produces the same output for the same raw tag list.
+// Stateless. Reads CONFIG.rawFile (every tag string the API has ever returned, unfiltered) and writes
+// CONFIG.outputFile: every valid tag grouped by slug, with any multi-tag string split into its parts
+// (config/delimiters.json, config/compound-tags.json). Fully regenerated on every run - same raw list
+// and config in, same file out.
 //
 // Output shape: { [slug]: { variants: string[], parts?: string[], primary?: string } }
 // - variants: every raw string (or split part) that slugifies to this slug
-// - parts/primary: only present when this slug is itself a compound (its raw string split into >1 part) -
-//   see lib/selectPrimaryTag.ts for how the default primary is chosen
+// - parts/primary: only when the slug is itself a compound (see lib/selectPrimaryTag.ts for primary)
 //
-// A tag/part is dropped if it fails isValidTag or slugifies to a blocklisted tag (see
-// data/blocklist.json - checked by slug, since blocklist entries and raw tags may differ in casing).
+// A tag/part is dropped if it fails isValidTag or slugifies to a config/blocklist.json entry.
 //
 // Usage: npm run tags:candidates
 
 import chalk from 'chalk';
 import fs from 'fs';
 
+import { loadConfig } from './config.ts';
 import { isValidTag } from './isValidTag.ts';
 import { selectPrimaryTag } from './selectPrimaryTag.ts';
 import { slugifyTagName } from './slugifyTagName.ts';
@@ -33,7 +30,6 @@ import { splitMultiTag } from './splitMultiTag.ts';
 
 const CONFIG = {
   rawFile: './data/1-tags-raw.json',
-  blocklistFile: './data/blocklist.json',
   outputFile: './data/2-candidates.json',
 
   // Length bounds passed to isValidTag - see lib/isValidTag.ts
@@ -54,12 +50,18 @@ type CandidateEntry = { variants: string[]; parts?: string[]; primary?: string }
 function main(): void {
   console.log(chalk.bgCyan('# Building candidates'));
 
+  const config = loadConfig();
   const rawTags: string[] = JSON.parse(fs.readFileSync(CONFIG.rawFile, 'utf-8'));
-  const blocklist: string[] = JSON.parse(fs.readFileSync(CONFIG.blocklistFile, 'utf-8'));
-  const blockedSlugs = new Set(blocklist.map((tag) => slugifyTagName(tag)));
+  const blockedSlugs = new Set(config.blocklist.map((tag) => slugifyTagName(tag)));
 
   const validationOptions = { minLength: CONFIG.minTagLength, maxLength: CONFIG.maxTagLength };
   const isKeepable = (tag: string) => isValidTag(tag, validationOptions) && !blockedSlugs.has(slugifyTagName(tag));
+
+  const splitOptions = {
+    separators: config.delimiters.separators,
+    connectors: config.delimiters.connectors,
+    protectedTags: config.compoundTags,
+  };
 
   const candidates: Record<string, CandidateEntry> = {};
   const addVariant = (tag: string) => {
@@ -87,22 +89,17 @@ function main(): void {
 
     addVariant(tag);
 
-    const allParts = splitMultiTag(tag);
-    const parts = allParts.filter(isKeepable);
+    const parts = splitMultiTag(tag, splitOptions).filter(isKeepable);
 
     if (parts.length > 1) {
       compoundCount += 1;
 
-      const slug = slugifyTagName(tag);
-      const entry = candidates[slug];
-      const partSlugs = parts.map((part) => slugifyTagName(part));
+      const entry = candidates[slugifyTagName(tag)];
 
-      entry.parts ??= partSlugs;
-      entry.primary ??= slugifyTagName(selectPrimaryTag(parts));
+      entry.parts ??= parts.map((part) => slugifyTagName(part));
+      entry.primary ??= slugifyTagName(selectPrimaryTag(parts, config.modifiers.prefix));
 
-      for (const part of parts) {
-        addVariant(part);
-      }
+      parts.forEach(addVariant);
     }
   }
 

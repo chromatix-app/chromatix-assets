@@ -1,0 +1,28 @@
+{
+  "description": "Words stripped from a tag slug to find the tag whose image it shares. A prefix is stripped only from the start ('classic-rock' -> 'rock'), a suffix only from the end ('acoustic-music' -> 'acoustic'); stripping repeats, and only applies when the remainder is itself a known tag. The stripped tag still displays verbatim in the app - this only decides which image it shows. Keep this to words that qualify era/generality/format without changing what the genre IS: 'death' in 'death-metal' or 'german' in 'german-folk' name a distinct genre and do not belong here. Order matters: earlier entries are tried first.",
+  "prefix": [
+    "general",
+    "contemporary",
+    "modern",
+    "traditional",
+    "classic",
+    "early",
+    "old-school",
+    "oldschool",
+    "vintage",
+    "retro",
+    "adult",
+    "original"
+  ],
+  "suffix": [
+    "music",
+    "general",
+    "revival",
+    "vocal",
+    "vocals",
+    "instrumental",
+    "instrumentals",
+    "classics",
+    "mainstream"
+  ]
+}
